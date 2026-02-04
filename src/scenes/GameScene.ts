@@ -436,6 +436,7 @@ export class GameScene extends Phaser.Scene {
 
     if (!proj.active || !enemy.active) return;
 
+    const hitAngle = proj.rotation;
     this.hitSparkEmitter.emitParticleAt(proj.x, proj.y);
 
     if (proj.isExplosive) {
@@ -452,9 +453,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (killed) {
-      this.onCreatureKilled(enemy);
+      this.onCreatureKilled(enemy, hitAngle);
     } else {
-      this.bloodEmitter.emitParticleAt(enemy.x, enemy.y, 3);
+      this.spawnDirectionalBlood(enemy.x, enemy.y, hitAngle, 3);
     }
   }
 
@@ -483,14 +484,16 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private onCreatureKilled(enemy: Creature) {
+  private onCreatureKilled(enemy: Creature, hitAngle?: number) {
     const xpMultiplier = this.spawnManager.getXpMultiplier();
     this.player.addXp(Math.floor(enemy.xpValue * xpMultiplier));
     this.killCount++;
 
     const bloodyMess = this.player.perkManager.hasBloodyMess();
-    this.spawnBloodEffect(enemy.x, enemy.y, bloodyMess);
-    this.spawnBloodDecal(enemy.x, enemy.y, bloodyMess);
+    const angle = hitAngle ?? Math.atan2(enemy.y - this.player.y, enemy.x - this.player.x);
+    this.spawnDirectionalBlood(enemy.x, enemy.y, angle, bloodyMess ? 16 : 8);
+    this.spawnBloodDecal(enemy.x, enemy.y, bloodyMess, angle);
+    this.spawnCorpse(enemy.x, enemy.y, enemy.creatureType);
 
     if (enemy.spawnsOnDeath && enemy.spawnCount > 0) {
       this.spawnManager.spawnBabySpiders(enemy.x, enemy.y, enemy.spawnCount);
@@ -556,12 +559,34 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.flash(100, 100, 255, 100, false);
   }
 
-  private spawnBloodEffect(x: number, y: number, extraBlood: boolean = false) {
-    const quantity = extraBlood ? 16 : 8;
-    this.bloodEmitter.emitParticleAt(x, y, quantity);
+  private spawnDirectionalBlood(x: number, y: number, angle: number, quantity: number) {
+    const speed = 80;
+    const spread = 0.5;
+
+    for (let i = 0; i < quantity; i++) {
+      const particleAngle = angle + (Math.random() - 0.5) * spread;
+      const particleSpeed = speed * (0.5 + Math.random() * 0.5);
+      const vx = Math.cos(particleAngle) * particleSpeed;
+      const vy = Math.sin(particleAngle) * particleSpeed;
+
+      const particle = this.add.circle(x, y, 3 + Math.random() * 2, 0xbb0000);
+      particle.setDepth(14);
+
+      this.tweens.add({
+        targets: particle,
+        x: x + vx * 3,
+        y: y + vy * 3,
+        alpha: 0,
+        scaleX: 0.3,
+        scaleY: 0.3,
+        duration: 300 + Math.random() * 200,
+        ease: 'Power2',
+        onComplete: () => particle.destroy()
+      });
+    }
   }
 
-  private spawnBloodDecal(x: number, y: number, extraBlood: boolean = false) {
+  private spawnBloodDecal(x: number, y: number, extraBlood: boolean = false, angle?: number) {
     while (this.bloodDecals.getLength() >= this.maxBloodDecals) {
       const oldest = this.bloodDecals.getFirst(true) as Phaser.GameObjects.Sprite;
       if (oldest) oldest.destroy();
@@ -569,12 +594,17 @@ export class GameScene extends Phaser.Scene {
 
     const decalCount = extraBlood ? 3 : 1;
     for (let i = 0; i < decalCount; i++) {
-      const offsetX = i === 0 ? 0 : (Math.random() - 0.5) * 30;
-      const offsetY = i === 0 ? 0 : (Math.random() - 0.5) * 30;
+      let offsetX = i === 0 ? 0 : (Math.random() - 0.5) * 30;
+      let offsetY = i === 0 ? 0 : (Math.random() - 0.5) * 30;
+
+      if (angle !== undefined && i === 0) {
+        offsetX = Math.cos(angle) * 15;
+        offsetY = Math.sin(angle) * 15;
+      }
 
       const decal = this.add.sprite(x + offsetX, y + offsetY, 'blood_decal');
       decal.setDepth(1);
-      decal.setRotation(Math.random() * Math.PI * 2);
+      decal.setRotation(angle ?? Math.random() * Math.PI * 2);
       decal.setScale(0.5 + Math.random() * 0.5);
       decal.setAlpha(0.8);
       this.bloodDecals.add(decal);
@@ -587,6 +617,28 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => decal.destroy()
       });
     }
+  }
+
+  private spawnCorpse(x: number, y: number, creatureType: CreatureType) {
+    const corpse = this.add.sprite(x, y, 'corpse');
+    corpse.setDepth(2);
+    corpse.setRotation(Math.random() * Math.PI * 2);
+    corpse.setAlpha(0.7);
+
+    const sizeScale = creatureType === CreatureType.BIG_ZOMBIE || creatureType === CreatureType.BOSS ? 1.5 :
+                      creatureType === CreatureType.SPIDER || creatureType === CreatureType.BABY_SPIDER ? 0.5 :
+                      creatureType === CreatureType.SPIDER_MOTHER || creatureType === CreatureType.ALIEN_BOSS ? 1.8 : 1.0;
+    corpse.setScale(sizeScale * (0.8 + Math.random() * 0.4));
+
+    this.bloodDecals.add(corpse);
+
+    this.tweens.add({
+      targets: corpse,
+      alpha: 0,
+      duration: 8000,
+      delay: 4000,
+      onComplete: () => corpse.destroy()
+    });
   }
 
   private spawnXpOrb(x: number, y: number) {
@@ -666,8 +718,10 @@ export class GameScene extends Phaser.Scene {
       if (c.active) {
         this.player.addXp(Math.floor(c.xpValue * xpMultiplier));
         this.killCount++;
-        this.spawnBloodEffect(c.x, c.y, true);
-        this.spawnBloodDecal(c.x, c.y, true);
+        const angle = Math.random() * Math.PI * 2;
+        this.spawnDirectionalBlood(c.x, c.y, angle, 16);
+        this.spawnBloodDecal(c.x, c.y, true, angle);
+        this.spawnCorpse(c.x, c.y, c.creatureType);
         c.takeDamage(9999);
       }
     });

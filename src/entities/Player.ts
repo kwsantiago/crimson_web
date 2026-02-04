@@ -32,6 +32,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private regenTimer: number = 0;
   private passiveXpTimer: number = 0;
   private shieldSprite?: Phaser.GameObjects.Arc;
+  private gunSprite: Phaser.GameObjects.Sprite;
+  private aimAngle: number = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, projectiles: Phaser.Physics.Arcade.Group) {
     super(scene, x, y, 'player');
@@ -59,6 +61,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.muzzleFlash = scene.add.sprite(x, y, 'muzzle_flash');
     this.muzzleFlash.setVisible(false);
     this.muzzleFlash.setDepth(10);
+
+    this.gunSprite = scene.add.sprite(x, y, 'gun_sprite');
+    this.gunSprite.setOrigin(0.2, 0.5);
+    this.gunSprite.setDepth(11);
 
     const keyboard = scene.input.keyboard!;
     this.keys = {
@@ -144,7 +150,19 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private handleAiming(pointer: Phaser.Input.Pointer) {
     const worldPoint = this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
     const angle = Phaser.Math.Angle.Between(this.x, this.y, worldPoint.x, worldPoint.y);
+    this.aimAngle = angle;
     this.setRotation(angle);
+    this.updateGunSprite();
+  }
+
+  private updateGunSprite() {
+    const gunOffset = 8;
+    this.gunSprite.setPosition(
+      this.x + Math.cos(this.aimAngle) * gunOffset,
+      this.y + Math.sin(this.aimAngle) * gunOffset
+    );
+    this.gunSprite.setRotation(this.aimAngle);
+    this.gunSprite.setFlipY(Math.abs(this.aimAngle) > Math.PI / 2);
   }
 
   private handleShooting(pointer: Phaser.Input.Pointer) {
@@ -161,12 +179,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private updateMuzzleFlash(delta: number) {
     if (this.muzzleFlashTimer > 0) {
       this.muzzleFlashTimer -= delta;
-      const offset = 20;
+      const offset = 24;
       this.muzzleFlash.setPosition(
-        this.x + Math.cos(this.rotation) * offset,
-        this.y + Math.sin(this.rotation) * offset
+        this.x + Math.cos(this.aimAngle) * offset,
+        this.y + Math.sin(this.aimAngle) * offset
       );
-      this.muzzleFlash.setRotation(this.rotation);
+      this.muzzleFlash.setRotation(this.aimAngle);
       if (this.muzzleFlashTimer <= 0) {
         this.muzzleFlash.setVisible(false);
       }

@@ -20,6 +20,8 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
   private projectileRate: number = 2.0;
   private projectiles?: Phaser.Physics.Arcade.Group;
   private poisonDamageTimer: number = 0;
+  private freezePulseTimer: number = 0;
+  private isDying: boolean = false;
 
   constructor(
     scene: Phaser.Scene,
@@ -57,7 +59,7 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
   }
 
   update(delta: number, player: Player) {
-    if (this.health <= 0 || !this.active) return;
+    if (this.health <= 0 || !this.active || this.isDying) return;
 
     const dt = delta / 1000;
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
@@ -65,9 +67,16 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     if (this.freezeTimer > 0) {
       this.freezeTimer -= dt;
       this.setVelocity(0, 0);
-      this.setTint(0x88ccff);
+      this.freezePulseTimer += dt;
+      const pulse = 0.95 + Math.sin(this.freezePulseTimer * 8) * 0.05;
+      this.setScale(pulse * (getCreatureData(this.creatureType).scale));
+      this.setTint(0x66ddff);
       return;
     } else {
+      if (this.freezePulseTimer > 0) {
+        this.freezePulseTimer = 0;
+        this.setScale(getCreatureData(this.creatureType).scale);
+      }
       this.clearTint();
     }
 
@@ -185,11 +194,32 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
   }
 
   private die() {
-    this.setActive(false);
-    this.setVisible(false);
+    if (this.isDying) return;
+    this.isDying = true;
+
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (body) {
       body.enable = false;
     }
+    this.setVelocity(0, 0);
+
+    this.setTint(0xffffff);
+    this.scene.time.delayedCall(50, () => {
+      if (!this.active) return;
+      this.clearTint();
+
+      this.scene.tweens.add({
+        targets: this,
+        alpha: 0,
+        scaleX: this.scaleX * 0.5,
+        scaleY: this.scaleY * 0.5,
+        duration: 250,
+        ease: 'Power2',
+        onComplete: () => {
+          this.setActive(false);
+          this.setVisible(false);
+        }
+      });
+    });
   }
 }
