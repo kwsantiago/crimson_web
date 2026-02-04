@@ -7,6 +7,8 @@ import { SpawnManager } from '../systems/SpawnManager';
 import { BonusManager } from '../systems/BonusManager';
 import { PerkSelector } from '../ui/PerkSelector';
 import { HighScoreManager } from '../systems/HighScoreManager';
+import { BitmapFont } from '../ui/BitmapFont';
+import { smallFontWidths } from './BootScene';
 import { GameMode, GAME_MODE_CONFIGS } from '../data/gameModes';
 import { CreatureType } from '../data/creatures';
 import { PerkId } from '../data/perks';
@@ -131,6 +133,7 @@ export class GameScene extends Phaser.Scene {
   private pauseEnterKey!: Phaser.Input.Keyboard.Key;
   private pauseButtonElements: Phaser.GameObjects.GameObject[] = [];
   private pauseClickHandled: boolean = false;
+  private bitmapFont: BitmapFont | null = null;
 
   constructor() {
     super('GameScene');
@@ -150,6 +153,10 @@ export class GameScene extends Phaser.Scene {
     this.game.canvas.oncontextmenu = (e) => e.preventDefault();
 
     this.highScoreManager = new HighScoreManager();
+
+    if (this.textures.exists('smallFont') && smallFontWidths) {
+      this.bitmapFont = new BitmapFont(this, 'smallFont', smallFontWidths);
+    }
 
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
@@ -463,20 +470,27 @@ export class GameScene extends Phaser.Scene {
     });
     this.hitSparkEmitter.setDepth(15);
 
-    this.bloodEmitter = this.add.particles(0, 0, 'blood_particle', {
-      speed: { min: 30, max: 100 },
-      scale: { start: 1, end: 0.3 },
-      lifespan: 400,
-      quantity: 8,
+    const bloodTexture = this.textures.exists('particles_sheet') ? 'particles_sheet' : 'blood_particle';
+    this.bloodEmitter = this.add.particles(0, 0, bloodTexture, {
+      frame: bloodTexture === 'particles_sheet' ? 5 : 0,
+      speed: { min: 80, max: 140 },
+      scale: { start: 0.5, end: 1.5 },
+      lifespan: 250,
+      quantity: 2,
+      alpha: { start: 0.8, end: 0 },
       emitting: false
     });
     this.bloodEmitter.setDepth(15);
 
-    this.explosionEmitter = this.add.particles(0, 0, 'explosion', {
+    const explosionTexture = this.textures.exists('particles_sheet') ? 'particles_sheet' : 'explosion';
+    this.explosionEmitter = this.add.particles(0, 0, explosionTexture, {
+      frame: explosionTexture === 'particles_sheet' ? 5 : 0,
       speed: { min: 20, max: 80 },
-      scale: { start: 1, end: 0 },
-      lifespan: 500,
-      quantity: 1,
+      scale: { start: 1, end: 3 },
+      lifespan: 700,
+      quantity: 3,
+      alpha: { start: 1, end: 0 },
+      rotate: { min: 0, max: 360 },
       emitting: false
     });
     this.explosionEmitter.setDepth(16);
@@ -797,6 +811,7 @@ export class GameScene extends Phaser.Scene {
       }
       if (this.perkSelector.isOpen()) {
         this.perkSelector.hide();
+        this.pendingPerks = 0;
         return;
       }
       if (this.isPaused) {
@@ -924,6 +939,10 @@ export class GameScene extends Phaser.Scene {
     const applyPoison = proj.isPoisoned;
     const killed = enemy.takeDamage(proj.damage, applyPoison);
 
+    if (proj.projectileType === ProjectileType.ION) {
+      this.trySpawnIonChain(enemy.x, enemy.y, proj.damage, enemy);
+    }
+
     if (!proj.penetrating) {
       proj.destroy();
     }
@@ -935,8 +954,38 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private trySpawnIonChain(x: number, y: number, damage: number, hitCreature: Creature) {
+    const maxDist = 100;
+    let nearestCreature: Creature | null = null;
+    let nearestDist = maxDist * maxDist;
+
+    this.creatures.getChildren().forEach((c) => {
+      const creature = c as Creature;
+      if (!creature.active || creature === hitCreature || creature.health <= 0) return;
+
+      const dx = creature.x - x;
+      const dy = creature.y - y;
+      const distSq = dx * dx + dy * dy;
+
+      if (distSq < nearestDist) {
+        nearestDist = distSq;
+        nearestCreature = creature;
+      }
+    });
+
+    if (nearestCreature !== null) {
+      const target = nearestCreature as Creature;
+      const angle = Math.atan2(target.y - y, target.x - x);
+      const chainBullet = this.projectiles.get(x, y, 'bullet') as Projectile;
+      if (chainBullet) {
+        chainBullet.fire(x, y, angle, 600, damage * 0.7, ProjectileType.ION);
+      }
+    }
+  }
+
   private createExplosion(x: number, y: number, radius: number, damage: number) {
-    this.explosionEmitter.emitParticleAt(x, y, 3);
+    const scale = radius / 80;
+    this.spawnExplosionBurst(x, y, scale);
     this.cameras.main.shake(200, 0.015);
     this.cameras.main.flash(100, 255, 200, 100, false);
 
@@ -1036,29 +1085,52 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnDirectionalBlood(x: number, y: number, angle: number, quantity: number) {
-    const speed = 80;
-    const spread = 0.5;
+    const baseAngle = angle + Math.PI;
+    const dirX = Math.cos(baseAngle);
+    const dirY = Math.sin(baseAngle);
+    const lifetime = 0.25;
 
     for (let i = 0; i < quantity; i++) {
-      const particleAngle = angle + (Math.random() - 0.5) * spread;
-      const particleSpeed = speed * (0.5 + Math.random() * 0.5);
-      const vx = Math.cos(particleAngle) * particleSpeed;
-      const vy = Math.sin(particleAngle) * particleSpeed;
+      const rotation = ((Math.random() * 64 - 32) * 0.1) + baseAngle;
+      const halfSize = Math.floor(Math.random() * 8) + 1;
+      const velX = ((Math.random() * 64) + 100) * dirX;
+      const velY = ((Math.random() * 64) + 100) * dirY;
+      const scaleStep = (Math.random() * 64) * 0.03 + 0.1;
 
-      const particle = this.add.circle(x, y, 3 + Math.random() * 2, 0xbb0000);
-      particle.setDepth(14);
+      if (this.textures.exists('particles_sheet')) {
+        const particle = this.add.image(x, y, 'particles_sheet', 5);
+        particle.setDepth(14);
+        particle.setRotation(rotation);
+        particle.setScale(halfSize / 16);
+        particle.setAlpha(0.5);
 
-      this.tweens.add({
-        targets: particle,
-        x: x + vx * 3,
-        y: y + vy * 3,
-        alpha: 0,
-        scaleX: 0.3,
-        scaleY: 0.3,
-        duration: 300 + Math.random() * 200,
-        ease: 'Power2',
-        onComplete: () => particle.destroy()
-      });
+        this.tweens.add({
+          targets: particle,
+          x: x + velX * lifetime,
+          y: y + velY * lifetime,
+          scaleX: particle.scaleX + scaleStep * lifetime,
+          scaleY: particle.scaleY + scaleStep * lifetime,
+          alpha: 0,
+          duration: 250,
+          ease: 'Linear',
+          onComplete: () => particle.destroy()
+        });
+      } else {
+        const particle = this.add.circle(x, y, halfSize, 0xbb0000);
+        particle.setDepth(14);
+
+        this.tweens.add({
+          targets: particle,
+          x: x + velX * lifetime,
+          y: y + velY * lifetime,
+          alpha: 0,
+          scaleX: 0.3,
+          scaleY: 0.3,
+          duration: 250,
+          ease: 'Linear',
+          onComplete: () => particle.destroy()
+        });
+      }
     }
   }
 
@@ -1095,26 +1167,162 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private spawnCorpse(x: number, y: number, creatureType: CreatureType) {
-    const corpse = this.add.sprite(x, y, 'corpse');
-    corpse.setDepth(2);
-    corpse.setRotation(Math.random() * Math.PI * 2);
-    corpse.setAlpha(0.7);
-
-    const sizeScale = creatureType === CreatureType.BIG_ZOMBIE || creatureType === CreatureType.BOSS ? 1.5 :
-                      creatureType === CreatureType.SPIDER || creatureType === CreatureType.BABY_SPIDER ? 0.5 :
-                      creatureType === CreatureType.SPIDER_MOTHER || creatureType === CreatureType.ALIEN_BOSS ? 1.8 : 1.0;
-    corpse.setScale(sizeScale * (0.8 + Math.random() * 0.4));
-
-    this.bloodDecals.add(corpse);
+  private spawnExplosionBurst(x: number, y: number, scale: number) {
+    const shockwaveRing = this.add.graphics();
+    shockwaveRing.setDepth(16);
+    shockwaveRing.fillStyle(0x999999, 1.0);
+    shockwaveRing.fillCircle(x, y, 32);
 
     this.tweens.add({
-      targets: corpse,
+      targets: shockwaveRing,
+      scaleX: scale * 25 * 0.35,
+      scaleY: scale * 25 * 0.35,
       alpha: 0,
-      duration: 8000,
-      delay: 4000,
-      onComplete: () => corpse.destroy()
+      duration: 350,
+      delay: 100,
+      ease: 'Linear',
+      onComplete: () => shockwaveRing.destroy()
     });
+
+    const brightFlash = this.add.graphics();
+    brightFlash.setDepth(17);
+    brightFlash.fillStyle(0xffffff, 1.0);
+    brightFlash.fillCircle(x, y, 32);
+
+    this.tweens.add({
+      targets: brightFlash,
+      scaleX: scale * 45 * 0.3,
+      scaleY: scale * 45 * 0.3,
+      alpha: 0,
+      duration: 300,
+      ease: 'Linear',
+      onComplete: () => brightFlash.destroy()
+    });
+
+    for (let i = 0; i < 2; i++) {
+      const darkPuff = this.add.graphics();
+      darkPuff.setDepth(14);
+      darkPuff.fillStyle(0x1a1a1a, 1.0);
+      darkPuff.fillCircle(x, y, 32);
+
+      const age = i * 0.2 - 0.5;
+      const lifetime = i * 0.2 + 0.6;
+      const rotation = Math.random() * 6.28;
+
+      this.tweens.add({
+        targets: darkPuff,
+        scaleX: scale * 5 * lifetime,
+        scaleY: scale * 5 * lifetime,
+        rotation: rotation + 1.4 * lifetime,
+        alpha: 0,
+        duration: lifetime * 1000,
+        delay: Math.max(0, -age * 1000),
+        ease: 'Linear',
+        onComplete: () => darkPuff.destroy()
+      });
+    }
+
+    const puffCount = 4;
+    for (let i = 0; i < puffCount; i++) {
+      const rotation = (Math.random() * 314) * 0.02;
+      const velX = ((Math.random() * 64) * 2 - 64);
+      const velY = ((Math.random() * 64) * 2 - 64);
+      const scaleStep = ((Math.floor(Math.random() * 8) - 3) & 7) * scale;
+      const rotStep = ((Math.floor(Math.random() * 8) + 3) & 7);
+
+      if (this.textures.exists('particles_sheet')) {
+        const puff = this.add.image(x, y, 'particles_sheet', 5);
+        puff.setDepth(15);
+        puff.setRotation(rotation);
+        puff.setAlpha(1.0);
+
+        this.tweens.add({
+          targets: puff,
+          x: x + velX * 0.7,
+          y: y + velY * 0.7,
+          scaleX: 1 + scaleStep * 0.7,
+          scaleY: 1 + scaleStep * 0.7,
+          rotation: rotation + rotStep * 0.7,
+          alpha: 0,
+          duration: 700,
+          ease: 'Linear',
+          onComplete: () => puff.destroy()
+        });
+      }
+    }
+  }
+
+  private spawnCorpse(x: number, y: number, creatureType: CreatureType) {
+    let frame = 0;
+    let sizeScale = 1.0;
+
+    if (this.textures.exists('bodyset_sheet')) {
+      switch (creatureType) {
+        case CreatureType.ZOMBIE:
+        case CreatureType.BIG_ZOMBIE:
+          frame = Math.floor(Math.random() * 4);
+          sizeScale = creatureType === CreatureType.BIG_ZOMBIE ? 1.5 : 1.0;
+          break;
+        case CreatureType.ALIEN:
+        case CreatureType.ALIEN_BOSS:
+          frame = 4 + Math.floor(Math.random() * 4);
+          sizeScale = creatureType === CreatureType.ALIEN_BOSS ? 1.8 : 1.0;
+          break;
+        case CreatureType.LIZARD:
+          frame = 8 + Math.floor(Math.random() * 4);
+          break;
+        case CreatureType.SPIDER:
+        case CreatureType.BABY_SPIDER:
+        case CreatureType.SPIDER_MOTHER:
+          frame = 12 + Math.floor(Math.random() * 4);
+          sizeScale = creatureType === CreatureType.SPIDER_MOTHER ? 1.8 :
+                      creatureType === CreatureType.BABY_SPIDER ? 0.5 : 0.7;
+          break;
+        case CreatureType.BOSS:
+          frame = Math.floor(Math.random() * 4);
+          sizeScale = 1.5;
+          break;
+        default:
+          frame = Math.floor(Math.random() * 16);
+      }
+
+      const corpse = this.add.sprite(x, y, 'bodyset_sheet', frame);
+      corpse.setDepth(2);
+      corpse.setRotation(Math.random() * Math.PI * 2);
+      corpse.setAlpha(0.7);
+      corpse.setScale(sizeScale * (0.8 + Math.random() * 0.4));
+      corpse.setTint(0xaa6666);
+
+      this.bloodDecals.add(corpse);
+
+      this.tweens.add({
+        targets: corpse,
+        alpha: 0,
+        duration: 8000,
+        delay: 4000,
+        onComplete: () => corpse.destroy()
+      });
+    } else {
+      const corpse = this.add.sprite(x, y, 'corpse');
+      corpse.setDepth(2);
+      corpse.setRotation(Math.random() * Math.PI * 2);
+      corpse.setAlpha(0.7);
+
+      sizeScale = creatureType === CreatureType.BIG_ZOMBIE || creatureType === CreatureType.BOSS ? 1.5 :
+                  creatureType === CreatureType.SPIDER || creatureType === CreatureType.BABY_SPIDER ? 0.5 :
+                  creatureType === CreatureType.SPIDER_MOTHER || creatureType === CreatureType.ALIEN_BOSS ? 1.8 : 1.0;
+      corpse.setScale(sizeScale * (0.8 + Math.random() * 0.4));
+
+      this.bloodDecals.add(corpse);
+
+      this.tweens.add({
+        targets: corpse,
+        alpha: 0,
+        duration: 8000,
+        delay: 4000,
+        onComplete: () => corpse.destroy()
+      });
+    }
   }
 
   private spawnXpOrb(x: number, y: number) {

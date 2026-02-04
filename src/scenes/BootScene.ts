@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
-import { PaqArchive, decodeJaz, jazToCanvas } from '../loaders/PaqLoader';
+import { PaqArchive, decodeJaz, jazToCanvas, decodeTga, tgaToCanvas } from '../loaders/PaqLoader';
 
 const PAQ_URL = './crimson.paq';
 const CACHE_KEY = 'crimson_paq_v1';
+
+export let smallFontWidths: Uint8Array | null = null;
 
 export class BootScene extends Phaser.Scene {
   private loadingText!: Phaser.GameObjects.Text;
@@ -191,6 +193,27 @@ export class BootScene extends Phaser.Scene {
 
     this.loadingText.setText(`Loaded ${loaded} textures`);
     await this.createAliasTextures();
+    await this.loadBitmapFont(archive);
+  }
+
+  private async loadBitmapFont(archive: PaqArchive) {
+    const widthsData = archive.get('load/smallFnt.dat');
+    const textureData = archive.get('load/smallWhite.tga');
+
+    if (!widthsData || !textureData) {
+      console.warn('Missing bitmap font assets (smallFnt.dat or smallWhite.tga)');
+      return;
+    }
+
+    try {
+      smallFontWidths = new Uint8Array(widthsData);
+      const tgaImage = decodeTga(textureData);
+      const canvas = tgaToCanvas(tgaImage);
+      this.textures.addCanvas('smallFont', canvas);
+      this.loadingText.setText('Loaded bitmap font');
+    } catch (err) {
+      console.warn('Failed to load bitmap font:', err);
+    }
   }
 
   private canvasToImage(canvas: HTMLCanvasElement): Promise<HTMLImageElement> {

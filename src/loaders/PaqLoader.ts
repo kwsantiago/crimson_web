@@ -233,3 +233,112 @@ export async function jazToBlob(jaz: JazImage, type = 'image/png'): Promise<Blob
 export function isJazFile(name: string): boolean {
   return name.toLowerCase().endsWith('.jaz');
 }
+
+export interface TgaImage {
+  width: number;
+  height: number;
+  rgba: Uint8ClampedArray;
+}
+
+export function decodeTga(data: Uint8Array): TgaImage {
+  if (data.length < 18) {
+    throw new Error('TGA data too short');
+  }
+
+  const idLength = data[0];
+  const colorMapType = data[1];
+  const imageType = data[2];
+  const width = data[12] | (data[13] << 8);
+  const height = data[14] | (data[15] << 8);
+  const bitsPerPixel = data[16];
+  const descriptor = data[17];
+
+  if (colorMapType !== 0) {
+    throw new Error('TGA color-mapped images not supported');
+  }
+
+  if (imageType !== 2 && imageType !== 10) {
+    throw new Error(`TGA image type ${imageType} not supported (only uncompressed/RLE RGB)`);
+  }
+
+  const bytesPerPixel = bitsPerPixel / 8;
+  if (bytesPerPixel !== 3 && bytesPerPixel !== 4) {
+    throw new Error(`TGA bits per pixel ${bitsPerPixel} not supported (only 24/32)`);
+  }
+
+  const flipVertical = (descriptor & 0x20) === 0;
+  let offset = 18 + idLength;
+
+  const rgba = new Uint8ClampedArray(width * height * 4);
+
+  if (imageType === 2) {
+    for (let y = 0; y < height; y++) {
+      const destY = flipVertical ? (height - 1 - y) : y;
+      for (let x = 0; x < width; x++) {
+        const destIndex = (destY * width + x) * 4;
+        const b = data[offset++];
+        const g = data[offset++];
+        const r = data[offset++];
+        const a = bytesPerPixel === 4 ? data[offset++] : 255;
+        rgba[destIndex] = r;
+        rgba[destIndex + 1] = g;
+        rgba[destIndex + 2] = b;
+        rgba[destIndex + 3] = a;
+      }
+    }
+  } else {
+    let pixelIndex = 0;
+    while (pixelIndex < width * height) {
+      const packet = data[offset++];
+      const count = (packet & 0x7F) + 1;
+      const isRle = (packet & 0x80) !== 0;
+
+      if (isRle) {
+        const b = data[offset++];
+        const g = data[offset++];
+        const r = data[offset++];
+        const a = bytesPerPixel === 4 ? data[offset++] : 255;
+        for (let i = 0; i < count && pixelIndex < width * height; i++) {
+          const y = Math.floor(pixelIndex / width);
+          const x = pixelIndex % width;
+          const destY = flipVertical ? (height - 1 - y) : y;
+          const destIndex = (destY * width + x) * 4;
+          rgba[destIndex] = r;
+          rgba[destIndex + 1] = g;
+          rgba[destIndex + 2] = b;
+          rgba[destIndex + 3] = a;
+          pixelIndex++;
+        }
+      } else {
+        for (let i = 0; i < count && pixelIndex < width * height; i++) {
+          const b = data[offset++];
+          const g = data[offset++];
+          const r = data[offset++];
+          const a = bytesPerPixel === 4 ? data[offset++] : 255;
+          const y = Math.floor(pixelIndex / width);
+          const x = pixelIndex % width;
+          const destY = flipVertical ? (height - 1 - y) : y;
+          const destIndex = (destY * width + x) * 4;
+          rgba[destIndex] = r;
+          rgba[destIndex + 1] = g;
+          rgba[destIndex + 2] = b;
+          rgba[destIndex + 3] = a;
+          pixelIndex++;
+        }
+      }
+    }
+  }
+
+  return { width, height, rgba };
+}
+
+export function tgaToCanvas(tga: TgaImage): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = tga.width;
+  canvas.height = tga.height;
+  const ctx = canvas.getContext('2d')!;
+  const imageData = ctx.createImageData(tga.width, tga.height);
+  imageData.data.set(tga.rgba);
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}

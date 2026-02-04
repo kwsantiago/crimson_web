@@ -31,6 +31,11 @@ const BEAM_TYPES = new Set([
   ProjectileType.FLAME,
 ]);
 
+const ROCKET_TYPES = new Set([
+  ProjectileType.ROCKET,
+  ProjectileType.NUKE,
+]);
+
 const PROJ_COLORS: Record<ProjectileType, { trail: number; head: number; rgb: [number, number, number] }> = {
   [ProjectileType.BULLET]: { trail: 0xdcdca0, head: 0xdcdca0, rgb: [0.94, 0.86, 0.63] },
   [ProjectileType.PLASMA]: { trail: 0xffffff, head: 0xffffff, rgb: [1.0, 1.0, 1.0] },
@@ -210,7 +215,8 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
   private shouldDrawTrail(type: ProjectileType): boolean {
     return BULLET_TRAIL_TYPES.has(type) ||
            PLASMA_PARTICLE_TYPES.has(type) ||
-           BEAM_TYPES.has(type);
+           BEAM_TYPES.has(type) ||
+           ROCKET_TYPES.has(type);
   }
 
   update(_time: number, delta: number) {
@@ -242,6 +248,8 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
           this.drawPlasmaParticles(dist, baseAlpha, colors);
         } else if (BEAM_TYPES.has(this.projectileType)) {
           this.drawBeamEffect(dist, baseAlpha, colors);
+        } else if (ROCKET_TYPES.has(this.projectileType)) {
+          this.drawRocketTrail(baseAlpha, colors);
         }
       }
     }
@@ -345,6 +353,35 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
 
     this.trail.fillStyle(colors.head, alpha * 0.8);
     this.trail.fillCircle(this.x, this.y, lineWidth * 2);
+  }
+
+  private drawRocketTrail(alpha: number, colors: { trail: number; head: number; rgb: [number, number, number] }) {
+    if (!this.trail) return;
+
+    const angle = this.rotation - Math.PI / 2;
+    const dirX = Math.cos(angle);
+    const dirY = Math.sin(angle);
+
+    const isNuke = this.projectileType === ProjectileType.NUKE;
+    const bloomSize = isNuke ? 180 : 140;
+    const innerSize = isNuke ? 80 : 60;
+    const bloomOffset = isNuke ? 8 : 5;
+    const innerOffset = isNuke ? 12 : 9;
+
+    const bloomX = this.x - dirX * bloomOffset;
+    const bloomY = this.y - dirY * bloomOffset;
+    this.trail.fillStyle(0xffffff, alpha * 0.35);
+    this.trail.fillCircle(bloomX, bloomY, bloomSize * 0.5);
+
+    const innerX = this.x - dirX * innerOffset;
+    const innerY = this.y - dirY * innerOffset;
+    const innerColor = isNuke ? 0xffaa44 : 0xffffff;
+    this.trail.fillStyle(innerColor, alpha * 0.5);
+    this.trail.fillCircle(innerX, innerY, innerSize * 0.5);
+
+    const coreColor = isNuke ? 0xffff88 : 0xffcc44;
+    this.trail.fillStyle(coreColor, alpha * 0.7);
+    this.trail.fillCircle(this.x, this.y, 8);
   }
 
   destroy(fromScene?: boolean) {
