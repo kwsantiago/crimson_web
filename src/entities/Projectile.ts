@@ -2,6 +2,63 @@ import Phaser from 'phaser';
 import { WORLD_WIDTH, WORLD_HEIGHT } from '../config';
 import { ProjectileType } from '../data/weapons';
 
+const PROJ_FRAMES: Record<ProjectileType, number> = {
+  [ProjectileType.BULLET]: 0,
+  [ProjectileType.PLASMA]: 13,
+  [ProjectileType.GAUSS]: 2,
+  [ProjectileType.FLAME]: 2,
+  [ProjectileType.ROCKET]: 8,
+  [ProjectileType.NUKE]: 8,
+  [ProjectileType.ION]: 2,
+  [ProjectileType.BLADE]: 6,
+  [ProjectileType.PULSE]: 0,
+  [ProjectileType.SHRINK]: 2,
+  [ProjectileType.SPLITTER]: 3,
+};
+
+const BULLET_TRAIL_TYPES = new Set([
+  ProjectileType.BULLET,
+  ProjectileType.GAUSS,
+]);
+
+const PLASMA_PARTICLE_TYPES = new Set([
+  ProjectileType.PLASMA,
+  ProjectileType.SHRINK,
+]);
+
+const BEAM_TYPES = new Set([
+  ProjectileType.ION,
+  ProjectileType.FLAME,
+]);
+
+const PROJ_COLORS: Record<ProjectileType, { trail: number; head: number; rgb: [number, number, number] }> = {
+  [ProjectileType.BULLET]: { trail: 0xdcdca0, head: 0xdcdca0, rgb: [0.94, 0.86, 0.63] },
+  [ProjectileType.PLASMA]: { trail: 0xffffff, head: 0xffffff, rgb: [1.0, 1.0, 1.0] },
+  [ProjectileType.GAUSS]: { trail: 0x78c8ff, head: 0x78c8ff, rgb: [0.47, 0.78, 1.0] },
+  [ProjectileType.FLAME]: { trail: 0xffaa5a, head: 0xffffff, rgb: [1.0, 0.67, 0.35] },
+  [ProjectileType.ROCKET]: { trail: 0xff6600, head: 0xffcc44, rgb: [1.0, 0.4, 0.0] },
+  [ProjectileType.NUKE]: { trail: 0xff4400, head: 0xffff44, rgb: [1.0, 0.27, 0.0] },
+  [ProjectileType.ION]: { trail: 0x78c8ff, head: 0x80ccff, rgb: [0.47, 0.78, 1.0] },
+  [ProjectileType.BLADE]: { trail: 0xf078ff, head: 0xcccccc, rgb: [0.94, 0.47, 1.0] },
+  [ProjectileType.PULSE]: { trail: 0x1a9933, head: 0x1a9933, rgb: [0.1, 0.6, 0.2] },
+  [ProjectileType.SHRINK]: { trail: 0x4d4dff, head: 0xa0ffaa, rgb: [0.3, 0.3, 1.0] },
+  [ProjectileType.SPLITTER]: { trail: 0xffaa44, head: 0xffe699, rgb: [1.0, 0.9, 0.1] },
+};
+
+const BEAM_SCALES: Record<ProjectileType, number> = {
+  [ProjectileType.ION]: 2.2,
+  [ProjectileType.FLAME]: 0.8,
+  [ProjectileType.BULLET]: 0.8,
+  [ProjectileType.PLASMA]: 0.8,
+  [ProjectileType.GAUSS]: 0.8,
+  [ProjectileType.ROCKET]: 0.8,
+  [ProjectileType.NUKE]: 0.8,
+  [ProjectileType.BLADE]: 0.8,
+  [ProjectileType.PULSE]: 0.8,
+  [ProjectileType.SHRINK]: 0.8,
+  [ProjectileType.SPLITTER]: 0.8,
+};
+
 export class Projectile extends Phaser.Physics.Arcade.Sprite {
   damage: number = 0;
   projectileType: ProjectileType = ProjectileType.BULLET;
@@ -17,6 +74,8 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
   private startY: number = 0;
   private trail?: Phaser.GameObjects.Graphics;
   private trailColor: number = 0xcccccc;
+  private projIndex: number = 0;
+  private static indexCounter: number = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, texture: string) {
     super(scene, x, y, texture);
@@ -24,6 +83,7 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     scene.physics.add.existing(this);
     this.setActive(false);
     this.setVisible(false);
+    this.projIndex = Projectile.indexCounter++;
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (body) {
       body.enable = false;
@@ -98,90 +158,59 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
   }
 
   private setupVisuals(type: ProjectileType) {
-    let frame = 0;
-    let scale = 0.6;
-    let tint = 0xffffff;
-    this.trailColor = 0x808080;
+    const frame = PROJ_FRAMES[type] ?? 0;
+    const colors = PROJ_COLORS[type] ?? PROJ_COLORS[ProjectileType.BULLET];
+    this.trailColor = colors.trail;
 
-    switch (type) {
-      case ProjectileType.BULLET:
-        this.setTexture('projs_sheet', 0);
-        scale = 0.5;
-        tint = 0xffffcc;
-        this.trailColor = 0xaaaaaa;
-        break;
-      case ProjectileType.PLASMA:
-        this.setTexture('projs_sheet', 3);
-        scale = 0.8;
-        tint = 0x44ffaa;
-        this.trailColor = 0x00ff88;
-        break;
-      case ProjectileType.FLAME:
-        this.setTexture('projs_sheet', 8);
-        scale = 0.9;
-        tint = 0xff8844;
-        this.trailColor = 0xff4400;
-        break;
-      case ProjectileType.GAUSS:
-        this.setTexture('projs_sheet', 1);
-        scale = 0.6;
-        tint = 0x66aaff;
-        this.trailColor = 0x3388ff;
-        break;
-      case ProjectileType.ROCKET:
-        this.setTexture('projs_sheet', 16);
-        scale = 1.0;
-        tint = 0xffcc44;
-        this.trailColor = 0xff6600;
-        break;
-      case ProjectileType.ION:
-        this.setTexture('projs_sheet', 2);
-        scale = 0.7;
-        tint = 0xaa66ff;
-        this.trailColor = 0x8800ff;
-        break;
-      case ProjectileType.PULSE:
-        this.setTexture('projs_sheet', 0);
-        scale = 0.7;
-        tint = 0xff66ff;
-        this.trailColor = 0xff00ff;
-        break;
-      case ProjectileType.NUKE:
-        this.setTexture('nuke');
-        scale = 1.0;
-        tint = 0xffff44;
-        break;
-      case ProjectileType.BLADE:
-        this.setTexture('projs_sheet', 6);
-        scale = 0.8;
-        tint = 0xcccccc;
-        break;
-      case ProjectileType.SHRINK:
-        this.setTexture('projs_sheet', 2);
-        scale = 0.6;
-        tint = 0x44ff44;
-        break;
-      case ProjectileType.SPLITTER:
-        this.setTexture('projs_sheet', 3);
-        scale = 0.7;
-        tint = 0xffaa44;
-        break;
-      default:
-        this.setTexture('projs_sheet', 0);
-        scale = 0.5;
-        tint = 0xffffff;
+    const isBeamType = BEAM_TYPES.has(type);
+    const isPlasmaType = PLASMA_PARTICLE_TYPES.has(type);
+
+    if (type === ProjectileType.NUKE) {
+      this.setTexture('nuke');
+      this.setScale(1.0);
+      this.setTint(colors.head);
+      this.setAlpha(1.0);
+      return;
     }
 
+    if (type === ProjectileType.ROCKET) {
+      this.setTexture('projs_sheet', frame);
+      this.setScale(1.2);
+      this.setTint(colors.head);
+      this.setAlpha(1.0);
+      return;
+    }
+
+    if (isPlasmaType || isBeamType) {
+      this.setTexture('projs_sheet', frame);
+      this.setScale(0.0);
+      this.setAlpha(0.0);
+      return;
+    }
+
+    if (BULLET_TRAIL_TYPES.has(type)) {
+      this.setTexture('projs_sheet', frame);
+      this.setScale(0.6);
+      this.setTint(colors.head);
+      this.setAlpha(1.0);
+      return;
+    }
+
+    let scale = 0.7;
+    if (type === ProjectileType.BLADE) scale = 0.8;
+    if (type === ProjectileType.PULSE) scale = 0.6;
+    if (type === ProjectileType.SPLITTER) scale = 0.7;
+
+    this.setTexture('projs_sheet', frame);
     this.setScale(scale);
-    this.setTint(tint);
+    this.setTint(colors.head);
     this.setAlpha(1.0);
   }
 
   private shouldDrawTrail(type: ProjectileType): boolean {
-    return type === ProjectileType.BULLET ||
-           type === ProjectileType.GAUSS ||
-           type === ProjectileType.PLASMA ||
-           type === ProjectileType.ION;
+    return BULLET_TRAIL_TYPES.has(type) ||
+           PLASMA_PARTICLE_TYPES.has(type) ||
+           BEAM_TYPES.has(type);
   }
 
   update(_time: number, delta: number) {
@@ -190,7 +219,9 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     this.lifespan += delta;
 
     const lifeRatio = this.lifespan / this.maxLifespan;
-    if (lifeRatio > 0.7) {
+    const life = 1.0 - lifeRatio;
+
+    if (lifeRatio > 0.7 && !PLASMA_PARTICLE_TYPES.has(this.projectileType) && !BEAM_TYPES.has(this.projectileType)) {
       this.setAlpha(1 - ((lifeRatio - 0.7) / 0.3));
     }
 
@@ -202,13 +233,29 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
       const dist = Math.sqrt(dx * dx + dy * dy);
 
       if (dist > 5) {
-        const alpha = Math.min(1.0, this.lifespan / 100) * (1 - lifeRatio * 0.5);
-        this.trail.lineStyle(2, this.trailColor, alpha);
-        this.trail.beginPath();
-        this.trail.moveTo(this.startX, this.startY);
-        this.trail.lineTo(this.x, this.y);
-        this.trail.strokePath();
+        const colors = PROJ_COLORS[this.projectileType] ?? PROJ_COLORS[ProjectileType.BULLET];
+        const baseAlpha = Math.min(1.0, life);
+
+        if (BULLET_TRAIL_TYPES.has(this.projectileType)) {
+          this.drawBulletTrail(dist, baseAlpha, colors);
+        } else if (PLASMA_PARTICLE_TYPES.has(this.projectileType)) {
+          this.drawPlasmaParticles(dist, baseAlpha, colors);
+        } else if (BEAM_TYPES.has(this.projectileType)) {
+          this.drawBeamEffect(dist, baseAlpha, colors);
+        }
       }
+    }
+
+    if (this.projectileType === ProjectileType.BLADE) {
+      const spinAngle = this.projIndex * 0.1 + this.lifespan * 0.01;
+      this.setRotation(spinAngle);
+    }
+
+    if (this.projectileType === ProjectileType.PULSE) {
+      const dist = Math.hypot(this.x - this.startX, this.y - this.startY);
+      const size = Math.min(dist * 0.16, 56) / 16;
+      this.setScale(Math.max(0.3, size));
+      this.setAlpha(0.7 * life);
     }
 
     if (this.lifespan >= this.maxLifespan ||
@@ -216,6 +263,88 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
         this.y < -50 || this.y > WORLD_HEIGHT + 50) {
       this.destroy();
     }
+  }
+
+  private drawBulletTrail(dist: number, alpha: number, colors: { trail: number; head: number; rgb: [number, number, number] }) {
+    if (!this.trail) return;
+
+    const trailAlpha = alpha * 0.6;
+    this.trail.lineStyle(2, colors.trail, trailAlpha);
+    this.trail.beginPath();
+    this.trail.moveTo(this.startX, this.startY);
+    this.trail.lineTo(this.x, this.y);
+    this.trail.strokePath();
+  }
+
+  private drawPlasmaParticles(dist: number, alpha: number, colors: { trail: number; head: number; rgb: [number, number, number] }) {
+    if (!this.trail) return;
+
+    const spacing = this.projectileType === ProjectileType.SHRINK ? 2.1 : 2.5;
+    const segLimit = this.projectileType === ProjectileType.SHRINK ? 3 : 8;
+    const tailSize = this.projectileType === ProjectileType.SHRINK ? 12 : 22;
+    const headSize = this.projectileType === ProjectileType.SHRINK ? 16 : 56;
+    const auraSize = 256;
+
+    let segCount = Math.floor(this.damage / 5);
+    segCount = Math.min(segCount, segLimit);
+
+    const angle = this.rotation - Math.PI / 2;
+    const dirX = Math.cos(angle);
+    const dirY = Math.sin(angle);
+
+    const tailAlpha = alpha * 0.4;
+    for (let i = 0; i < segCount; i++) {
+      const px = this.x + dirX * spacing * i * 3;
+      const py = this.y + dirY * spacing * i * 3;
+      const size = tailSize * 0.5;
+
+      this.trail.fillStyle(colors.trail, tailAlpha);
+      this.trail.fillCircle(px, py, size);
+    }
+
+    const headAlpha = alpha * 0.45;
+    this.trail.fillStyle(colors.head, headAlpha);
+    this.trail.fillCircle(this.x, this.y, headSize * 0.5);
+
+    const auraAlpha = alpha * 0.15;
+    this.trail.fillStyle(colors.head, auraAlpha);
+    this.trail.fillCircle(this.x, this.y, auraSize * 0.25);
+  }
+
+  private drawBeamEffect(dist: number, alpha: number, colors: { trail: number; head: number; rgb: [number, number, number] }) {
+    if (!this.trail) return;
+
+    const isFireBullets = this.projectileType === ProjectileType.FLAME;
+    const effectScale = BEAM_SCALES[this.projectileType] ?? 0.8;
+
+    const dx = this.x - this.startX;
+    const dy = this.y - this.startY;
+    const dirX = dx / dist;
+    const dirY = dy / dist;
+
+    const maxLen = 256;
+    const start = dist > maxLen ? dist - maxLen : 0;
+    const span = Math.min(dist, maxLen);
+    const step = Math.min(effectScale * 3.1, 9.0);
+    const lineWidth = effectScale * 3;
+
+    const streakColor = isFireBullets ? 0xffaa5a : 0x80ccff;
+
+    for (let s = start; s < dist; s += step) {
+      const t = span > 0 ? (s - start) / span : 1.0;
+      const segAlpha = t * alpha * 0.6;
+
+      if (segAlpha > 0.01) {
+        const px = this.startX + dirX * s;
+        const py = this.startY + dirY * s;
+
+        this.trail.fillStyle(streakColor, segAlpha);
+        this.trail.fillCircle(px, py, lineWidth);
+      }
+    }
+
+    this.trail.fillStyle(colors.head, alpha * 0.8);
+    this.trail.fillCircle(this.x, this.y, lineWidth * 2);
   }
 
   destroy(fromScene?: boolean) {

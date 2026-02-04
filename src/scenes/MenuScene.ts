@@ -127,9 +127,9 @@ export class MenuScene extends Phaser.Scene {
 
     this.menuEntries = [
       { slot: 1, label: 'PLAY GAME', action: 'play', y: baseY + step, hoverAmount: 0, enabled: true },
-      { slot: 2, label: 'OPTIONS', action: 'options', y: baseY + step * 2, hoverAmount: 0, enabled: false },
+      { slot: 2, label: 'OPTIONS', action: 'options', y: baseY + step * 2, hoverAmount: 0, enabled: true },
       { slot: 3, label: 'HIGH SCORES', action: 'scores', y: baseY + step * 3, hoverAmount: 0, enabled: true },
-      { slot: 4, label: 'QUIT', action: 'quit', y: baseY + step * 4, hoverAmount: 0, enabled: false },
+      { slot: 4, label: 'QUIT', action: 'quit', y: baseY + step * 4, hoverAmount: 0, enabled: true },
     ];
   }
 

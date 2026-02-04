@@ -121,6 +121,16 @@ export class GameScene extends Phaser.Scene {
   private ammoIndicators: Phaser.GameObjects.Image[] = [];
   private xpPanelSprite!: Phaser.GameObjects.Image;
   private elapsedMs: number = 0;
+  private escapeKey!: Phaser.Input.Keyboard.Key;
+  private menuCursor!: Phaser.GameObjects.Image;
+  private isPaused: boolean = false;
+  private pauseContainer!: Phaser.GameObjects.Container;
+  private pauseSelectedIndex: number = 2; // Default to "BACK"
+  private pauseArrowUp!: Phaser.Input.Keyboard.Key;
+  private pauseArrowDown!: Phaser.Input.Keyboard.Key;
+  private pauseEnterKey!: Phaser.Input.Keyboard.Key;
+  private pauseButtonElements: Phaser.GameObjects.GameObject[] = [];
+  private pauseClickHandled: boolean = false;
 
   constructor() {
     super('GameScene');
@@ -210,6 +220,180 @@ export class GameScene extends Phaser.Scene {
 
     this.setupCollisions();
     this.createHUD();
+
+    this.escapeKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+
+    if (this.textures.exists('ui_cursor')) {
+      this.menuCursor = this.add.image(0, 0, 'ui_cursor');
+      this.menuCursor.setScrollFactor(0);
+      this.menuCursor.setDepth(600);
+      this.menuCursor.setVisible(false);
+    }
+
+    this.createPauseMenu();
+  }
+
+  private createPauseMenu() {
+    this.pauseContainer = this.add.container(0, 0);
+    this.pauseContainer.setScrollFactor(0);
+    this.pauseContainer.setDepth(300);
+    this.pauseContainer.setVisible(false);
+
+    const overlay = this.add.rectangle(
+      SCREEN_WIDTH / 2,
+      SCREEN_HEIGHT / 2,
+      SCREEN_WIDTH,
+      SCREEN_HEIGHT,
+      0x000000,
+      0.7
+    );
+    this.pauseContainer.add(overlay);
+  }
+
+  private showPauseMenu() {
+    this.isPaused = true;
+    this.pauseSelectedIndex = 2;
+    this.pauseContainer.setVisible(true);
+
+    if (this.menuCursor) {
+      this.menuCursor.setVisible(true);
+    }
+    if (this.crosshair) {
+      this.crosshair.setVisible(false);
+    }
+  }
+
+  private hidePauseMenu() {
+    this.isPaused = false;
+    this.pauseContainer.setVisible(false);
+
+    this.pauseButtonElements.forEach(el => el.destroy());
+    this.pauseButtonElements = [];
+
+    if (this.menuCursor) {
+      this.menuCursor.setVisible(false);
+    }
+    if (this.crosshair) {
+      this.crosshair.setVisible(true);
+    }
+  }
+
+  private drawPauseMenuButtons() {
+    const scale = Math.min(SCREEN_WIDTH / UI.BASE_WIDTH, SCREEN_HEIGHT / UI.BASE_HEIGHT);
+    const clampedScale = Math.max(0.75, Math.min(1.5, scale));
+    const sx = (v: number) => v * clampedScale;
+
+    const panelW = sx(280);
+    const panelH = sx(220);
+    const panelX = SCREEN_WIDTH / 2;
+    const panelY = SCREEN_HEIGHT / 2;
+
+    const panel = this.add.rectangle(panelX, panelY, panelW, panelH, 0x1a1612, 0.95);
+    panel.setStrokeStyle(2, 0x3d3830);
+    panel.setScrollFactor(0);
+    panel.setDepth(300);
+    this.pauseButtonElements.push(panel);
+
+    const title = this.add.text(panelX, panelY - sx(70), 'PAUSED', {
+      fontSize: `${Math.floor(20 * clampedScale)}px`,
+      color: '#f0c850',
+      fontFamily: 'Arial Black'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
+    this.pauseButtonElements.push(title);
+
+    const buttonX = panelX;
+    const entries = [
+      { label: 'OPTIONS', y: panelY - sx(25), action: 'options' },
+      { label: 'QUIT TO MENU', y: panelY + sx(15), action: 'quit' },
+      { label: 'BACK', y: panelY + sx(55), action: 'back' },
+    ];
+
+    const pointer = this.input.activePointer;
+
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      const btnW = sx(140);
+      const btnH = sx(26);
+      const bounds = {
+        x: buttonX - btnW / 2,
+        y: entry.y - btnH / 2,
+        w: btnW,
+        h: btnH
+      };
+
+      const hovering = pointer.x >= bounds.x && pointer.x <= bounds.x + bounds.w &&
+                       pointer.y >= bounds.y && pointer.y <= bounds.y + bounds.h;
+
+      if (hovering) {
+        this.pauseSelectedIndex = i;
+      }
+
+      const isSelected = i === this.pauseSelectedIndex;
+      const color = isSelected ? '#ffffff' : '#dcdcdc';
+      const bgColor = isSelected ? 0x404070 : 0x222222;
+      const borderColor = isSelected ? 0x8080b0 : 0x444444;
+
+      const bg = this.add.rectangle(buttonX, entry.y, btnW, btnH, bgColor, 0.9);
+      bg.setStrokeStyle(2, borderColor);
+      bg.setScrollFactor(0);
+      bg.setDepth(301);
+      this.pauseButtonElements.push(bg);
+
+      const text = this.add.text(buttonX, entry.y, entry.label, {
+        fontSize: `${Math.floor(12 * clampedScale)}px`,
+        color,
+        fontFamily: 'Arial Black'
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(302);
+      this.pauseButtonElements.push(text);
+
+      if (hovering && pointer.isDown && !this.pauseClickHandled) {
+        this.pauseClickHandled = true;
+        this.handlePauseMenuAction(entry.action);
+      }
+    }
+  }
+
+  private handlePauseMenuAction(action: string) {
+    switch (action) {
+      case 'options':
+        break;
+      case 'quit':
+        this.scene.start('MenuScene');
+        break;
+      case 'back':
+        this.hidePauseMenu();
+        break;
+    }
+  }
+
+  private updatePauseMenu() {
+    if (!this.pauseArrowUp) {
+      this.pauseArrowUp = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
+      this.pauseArrowDown = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
+      this.pauseEnterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.pauseArrowDown)) {
+      this.pauseSelectedIndex = (this.pauseSelectedIndex + 1) % 3;
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.pauseArrowUp)) {
+      this.pauseSelectedIndex = (this.pauseSelectedIndex - 1 + 3) % 3;
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.pauseEnterKey)) {
+      const actions = ['options', 'quit', 'back'];
+      this.handlePauseMenuAction(actions[this.pauseSelectedIndex]);
+      return;
+    }
+
+    this.pauseButtonElements.forEach(el => el.destroy());
+    this.pauseButtonElements = [];
+
+    this.drawPauseMenuButtons();
+
+    const pointer = this.input.activePointer;
+    if (!pointer.isDown) {
+      this.pauseClickHandled = false;
+    }
   }
 
   private setupCollisions() {
@@ -401,13 +585,13 @@ export class GameScene extends Phaser.Scene {
       fontFamily: 'Arial Black'
     }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setVisible(false);
 
-    this.perkPromptText = this.add.text(SCREEN_WIDTH / 2, 60, 'Press P to choose a perk!', {
+    this.perkPromptText = this.add.text(SCREEN_WIDTH / 2, 60, 'Press Mouse2 to pick a perk!', {
       fontSize: '16px',
       color: '#f0c850',
       fontFamily: 'Arial Black'
     }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setVisible(false);
 
-    this.add.text(8, SCREEN_HEIGHT - 24, 'WASD Move | R Reload | P Perks', {
+    this.add.text(8, SCREEN_HEIGHT - 24, 'WASD Move | Mouse2 Perks | ESC Menu', {
       fontSize: '10px',
       color: '#aaaab4',
       fontFamily: 'Arial'
@@ -606,17 +790,70 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, delta: number) {
     const pointer = this.input.activePointer;
 
+    if (Phaser.Input.Keyboard.JustDown(this.escapeKey)) {
+      if (this.gameOver) {
+        this.scene.start('MenuScene');
+        return;
+      }
+      if (this.perkSelector.isOpen()) {
+        this.perkSelector.hide();
+        return;
+      }
+      if (this.isPaused) {
+        this.hidePauseMenu();
+        return;
+      }
+      this.showPauseMenu();
+      return;
+    }
+
+    if (this.menuCursor) {
+      this.menuCursor.setPosition(pointer.x, pointer.y);
+    }
     if (this.crosshair) {
       this.crosshair.setPosition(pointer.x, pointer.y);
     }
 
-    if (this.gameOver) return;
+    if (this.gameOver) {
+      if (this.menuCursor) {
+        this.menuCursor.setVisible(true);
+      }
+      if (this.crosshair) {
+        this.crosshair.setVisible(false);
+      }
+      return;
+    }
+
+    if (this.isPaused) {
+      this.physics.pause();
+      this.updatePauseMenu();
+      return;
+    }
 
     this.elapsedMs += delta;
 
     if (this.perkSelector.isOpen()) {
+      this.physics.pause();
       this.perkSelector.update();
-      return;
+      if (this.menuCursor) {
+        this.menuCursor.setVisible(true);
+        this.menuCursor.setPosition(pointer.x, pointer.y);
+      }
+      if (this.crosshair) {
+        this.crosshair.setVisible(false);
+      }
+      return; // Game is paused while perk menu is open
+    }
+
+    if (this.physics.world.isPaused) {
+      this.physics.resume();
+    }
+
+    if (this.menuCursor) {
+      this.menuCursor.setVisible(false);
+    }
+    if (this.crosshair) {
+      this.crosshair.setVisible(true);
     }
 
     const rightDown = pointer.rightButtonDown();
