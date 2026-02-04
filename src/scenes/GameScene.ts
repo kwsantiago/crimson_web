@@ -106,7 +106,7 @@ export class GameScene extends Phaser.Scene {
   private bloodEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private maxBloodDecals: number = 100;
   private pendingPerks: number = 0;
-  private perkKey!: Phaser.Input.Keyboard.Key;
+  private rightWasDown: boolean = false;
   private gameStartTime: number = 0;
   private explosionEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private gameMode: GameMode = GameMode.SURVIVAL;
@@ -134,7 +134,10 @@ export class GameScene extends Phaser.Scene {
     this.gameOver = false;
     this.killCount = 0;
     this.pendingPerks = 0;
+    this.rightWasDown = false;
     this.gameStartTime = Date.now();
+
+    this.game.canvas.oncontextmenu = (e) => e.preventDefault();
 
     this.highScoreManager = new HighScoreManager();
 
@@ -204,7 +207,6 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
-    this.perkKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.P);
 
     this.setupCollisions();
     this.createHUD();
@@ -418,7 +420,7 @@ export class GameScene extends Phaser.Scene {
     if (this.textures.exists('ui_aim')) {
       this.crosshair = this.add.image(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 'ui_aim');
       this.crosshair.setScrollFactor(0);
-      this.crosshair.setDepth(200);
+      this.crosshair.setDepth(500);
       this.crosshair.setScale(this.hudScale);
     }
 
@@ -494,7 +496,7 @@ export class GameScene extends Phaser.Scene {
 
     if (this.pendingPerks > 0 && !this.perkSelector.isOpen()) {
       this.perkPromptText.setVisible(true);
-      this.perkPromptText.setText(`Press P to choose a perk! (${this.pendingPerks} pending)`);
+      this.perkPromptText.setText(`Press Mouse2 to pick a perk (${this.pendingPerks})`);
     } else {
       this.perkPromptText.setVisible(false);
     }
@@ -602,6 +604,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number) {
+    const pointer = this.input.activePointer;
+
+    if (this.crosshair) {
+      this.crosshair.setPosition(pointer.x, pointer.y);
+    }
+
     if (this.gameOver) return;
 
     this.elapsedMs += delta;
@@ -611,12 +619,14 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    if (this.pendingPerks > 0 && Phaser.Input.Keyboard.JustDown(this.perkKey)) {
+    const rightDown = pointer.rightButtonDown();
+    const rightJustPressed = rightDown && !this.rightWasDown;
+    this.rightWasDown = rightDown;
+
+    if (this.pendingPerks > 0 && rightJustPressed && !pointer.leftButtonDown()) {
       this.perkSelector.show();
       return;
     }
-
-    const pointer = this.input.activePointer;
     const leveledUp = this.player.update(delta, pointer);
 
     if (leveledUp) {
@@ -967,150 +977,219 @@ export class GameScene extends Phaser.Scene {
       this.gameMode
     );
 
-    const centerX = this.cameras.main.scrollX + SCREEN_WIDTH / 2;
-    const centerY = this.cameras.main.scrollY + SCREEN_HEIGHT / 2;
+    const scale = Math.min(
+      SCREEN_WIDTH / UI.BASE_WIDTH,
+      SCREEN_HEIGHT / UI.BASE_HEIGHT
+    );
+    const clampedScale = Math.max(0.75, Math.min(1.5, scale));
+    const sx = (v: number) => v * clampedScale;
+
+    const widescreenShiftY = (SCREEN_WIDTH / 640) * 150 - 150;
+    const panelW = UI.GAME_OVER.PANEL_W * clampedScale;
+    const panelH = UI.GAME_OVER.PANEL_H * clampedScale;
+    const panelX = (UI.GAME_OVER.PANEL_X + UI.GAME_OVER.PANEL_OFFSET_X) * clampedScale;
+    const panelY = (UI.GAME_OVER.PANEL_Y + UI.GAME_OVER.PANEL_OFFSET_Y + widescreenShiftY) * clampedScale;
 
     this.add.rectangle(
-      centerX,
-      centerY,
+      SCREEN_WIDTH / 2,
+      SCREEN_HEIGHT / 2,
       SCREEN_WIDTH,
       SCREEN_HEIGHT,
       0x000000,
-      0.8
-    ).setDepth(200);
+      0.5
+    ).setScrollFactor(0).setDepth(200);
 
-    const panelW = UI.GAME_OVER.PANEL_W;
-    const panelH = UI.GAME_OVER.PANEL_H;
+    if (this.textures.exists('ui_menuPanel')) {
+      const panel = this.add.image(panelX, panelY, 'ui_menuPanel');
+      panel.setOrigin(0, 0);
+      panel.setDisplaySize(panelW, panelH);
+      panel.setScrollFactor(0);
+      panel.setDepth(200);
+    } else {
+      const panelGraphics = this.add.graphics();
+      panelGraphics.setScrollFactor(0);
+      panelGraphics.setDepth(200);
+      panelGraphics.fillStyle(0x1a1612, UI.ALPHA.PANEL);
+      panelGraphics.fillRoundedRect(panelX, panelY, panelW, panelH, 8);
+      panelGraphics.lineStyle(2, 0x3d3830, 0.8);
+      panelGraphics.strokeRoundedRect(panelX, panelY, panelW, panelH, 8);
+    }
 
-    const panelGraphics = this.add.graphics();
-    panelGraphics.setDepth(200);
+    const bannerX = panelX + (panelW - sx(UI.GAME_OVER.BANNER_W)) * 0.5;
+    const bannerY = panelY + sx(40);
 
-    panelGraphics.fillStyle(UI.COLORS.SHADOW, UI.ALPHA.SHADOW);
-    panelGraphics.fillRoundedRect(
-      centerX - panelW / 2 + UI.SHADOW_OFFSET,
-      centerY - panelH / 2 + UI.SHADOW_OFFSET,
-      panelW,
-      panelH,
-      8
-    );
+    if (this.textures.exists('ui_textReaper')) {
+      const reaper = this.add.image(bannerX, bannerY, 'ui_textReaper');
+      reaper.setOrigin(0, 0);
+      reaper.setDisplaySize(sx(UI.GAME_OVER.BANNER_W), sx(UI.GAME_OVER.BANNER_H));
+      reaper.setScrollFactor(0);
+      reaper.setDepth(201);
+    } else {
+      this.add.text(bannerX + sx(128), bannerY + sx(32), 'THE REAPER', {
+        fontSize: `${Math.floor(28 * clampedScale)}px`,
+        color: '#cc3333',
+        fontFamily: 'Arial Black',
+        stroke: '#000000',
+        strokeThickness: 2,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    }
 
-    panelGraphics.fillStyle(0x1a1612, UI.ALPHA.PANEL);
-    panelGraphics.fillRoundedRect(centerX - panelW / 2, centerY - panelH / 2, panelW, panelH, 8);
-
-    panelGraphics.lineStyle(2, 0x3d3830, 0.8);
-    panelGraphics.strokeRoundedRect(centerX - panelW / 2, centerY - panelH / 2, panelW, panelH, 8);
-
-    panelGraphics.lineStyle(1, 0x4a4438, 0.5);
-    panelGraphics.strokeRoundedRect(
-      centerX - panelW / 2 + 4,
-      centerY - panelH / 2 + 4,
-      panelW - 8,
-      panelH - 8,
-      6
-    );
-
-    this.add.text(centerX, centerY - 90, 'THE REAPER', {
-      fontSize: '32px',
-      color: '#cc3333',
-      fontFamily: 'Arial Black',
-      stroke: '#000000',
-      strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(201);
-
-    const modeConfig = GAME_MODE_CONFIGS[this.gameMode];
-    const modeColor = this.gameMode === GameMode.RUSH ? '#f0c850' : '#46b4f0';
-    this.add.text(centerX, centerY - 55, modeConfig.name.toUpperCase() + ' MODE', {
-      fontSize: '14px',
-      color: modeColor,
-      fontFamily: 'Arial Black'
-    }).setOrigin(0.5).setDepth(201);
+    const scoreCardX = bannerX + sx(30);
+    const scoreCardY = bannerY + sx(80);
 
     const score = this.killCount * 100 + this.player.level * 500 + Math.floor(timePlayed / 100);
     const finalScore = this.gameMode === GameMode.RUSH ? Math.floor(score * 1.2) : score;
 
-    this.add.text(centerX - 80, centerY - 25, 'Score', {
-      fontSize: '13px',
+    this.add.text(scoreCardX + sx(32), scoreCardY, 'Score', {
+      fontSize: `${Math.floor(13 * clampedScale)}px`,
       color: '#e6e6e6',
       fontFamily: 'Arial'
-    }).setOrigin(0.5).setDepth(201);
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(201);
 
-    this.add.text(centerX - 80, centerY - 5, `${finalScore}`, {
-      fontSize: '18px',
+    this.add.text(scoreCardX + sx(32), scoreCardY + sx(15), `${finalScore}`, {
+      fontSize: `${Math.floor(16 * clampedScale)}px`,
       color: '#e6e6ff',
       fontFamily: 'Arial Black'
-    }).setOrigin(0.5).setDepth(201);
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(201);
 
-    if (isHighScore) {
-      this.add.text(centerX - 80, centerY + 18, `Rank: ${this.getOrdinal(rank)}`, {
-        fontSize: '12px',
-        color: '#f0c850',
-        fontFamily: 'Arial'
-      }).setOrigin(0.5).setDepth(201);
+    this.add.text(scoreCardX + sx(32), scoreCardY + sx(30), `Rank: ${this.getOrdinal(rank + 1)}`, {
+      fontSize: `${Math.floor(12 * clampedScale)}px`,
+      color: isHighScore ? '#f0c850' : '#e6e6e6',
+      fontFamily: 'Arial'
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(201);
+
+    const sepX = scoreCardX + sx(80);
+    const lineGraphics = this.add.graphics();
+    lineGraphics.setScrollFactor(0);
+    lineGraphics.setDepth(201);
+    lineGraphics.lineStyle(1, 0xe6e6e6, 0.5);
+    lineGraphics.lineBetween(sepX, scoreCardY, sepX, scoreCardY + sx(48));
+
+    const col2X = scoreCardX + sx(96);
+    this.add.text(col2X + sx(6), scoreCardY, 'Game time', {
+      fontSize: `${Math.floor(13 * clampedScale)}px`,
+      color: '#e6e6e6',
+      fontFamily: 'Arial'
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(201);
+
+    if (this.textures.exists('ui_clockTable')) {
+      const clock = this.add.image(col2X + sx(8), scoreCardY + sx(14), 'ui_clockTable');
+      clock.setOrigin(0, 0);
+      clock.setDisplaySize(sx(32), sx(32));
+      clock.setScrollFactor(0);
+      clock.setDepth(201);
     }
 
-    panelGraphics.lineStyle(1, 0x3d3830, 0.5);
-    panelGraphics.lineBetween(centerX - 20, centerY - 30, centerX - 20, centerY + 30);
+    if (this.textures.exists('ui_clockPointer')) {
+      const seconds = Math.floor(timePlayed / 1000);
+      const rotation = seconds * 6 * (Math.PI / 180);
+      const pointer = this.add.image(col2X + sx(24), scoreCardY + sx(30), 'ui_clockPointer');
+      pointer.setDisplaySize(sx(32), sx(32));
+      pointer.setScrollFactor(0);
+      pointer.setDepth(202);
+      pointer.setRotation(rotation);
+    }
 
-    this.add.text(centerX + 60, centerY - 25, 'Game time', {
-      fontSize: '13px',
+    const timeText = this.highScoreManager.formatTime(timePlayed);
+    this.add.text(col2X + sx(40), scoreCardY + sx(19), timeText, {
+      fontSize: `${Math.floor(13 * clampedScale)}px`,
       color: '#e6e6e6',
       fontFamily: 'Arial'
-    }).setOrigin(0.5).setDepth(201);
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(201);
 
-    this.add.text(centerX + 60, centerY - 5, this.highScoreManager.formatTime(timePlayed), {
-      fontSize: '16px',
-      color: '#dcdcdc',
-      fontFamily: 'Arial'
-    }).setOrigin(0.5).setDepth(201);
+    const row2Y = scoreCardY + sx(52);
 
-    this.add.text(centerX, centerY + 50, `Frags: ${this.killCount}`, {
-      fontSize: '14px',
+    if (this.weaponIcon && this.textures.exists('ui_wicons')) {
+      const weaponIndex = this.player.weaponManager.currentWeaponIndex;
+      const iconIndex = WEAPON_ICON_INDICES[weaponIndex] ?? 0;
+      const tex = this.textures.get('ui_wicons');
+      const texW = tex.getSourceImage().width;
+      const texH = tex.getSourceImage().height;
+      const cellW = texW / 8;
+      const cellH = texH / 8;
+      const frame = iconIndex * 2;
+      const col = frame % 8;
+      const row = Math.floor(frame / 8);
+
+      const wicon = this.add.image(scoreCardX, row2Y, 'ui_wicons');
+      wicon.setOrigin(0, 0);
+      wicon.setDisplaySize(sx(64), sx(32));
+      wicon.setCrop(col * cellW, row * cellH, cellW * 2, cellH);
+      wicon.setScrollFactor(0);
+      wicon.setDepth(201);
+    }
+
+    this.add.text(scoreCardX + sx(110), row2Y + sx(1), `Frags: ${this.killCount}`, {
+      fontSize: `${Math.floor(13 * clampedScale)}px`,
       color: '#e6e6e6',
       fontFamily: 'Arial'
-    }).setOrigin(0.5).setDepth(201);
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(201);
 
-    this.add.text(centerX, centerY + 72, `Level: ${this.player.level}`, {
-      fontSize: '14px',
+    this.add.text(scoreCardX + sx(110), row2Y + sx(15), `Level: ${this.player.level}`, {
+      fontSize: `${Math.floor(13 * clampedScale)}px`,
       color: '#e6e6e6',
       fontFamily: 'Arial'
-    }).setOrigin(0.5).setDepth(201);
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(201);
 
-    const playAgainBtn = this.createGameOverButton(centerX - 80, centerY + 105, 'Play Again', () => {
+    const buttonY = scoreCardY + sx(100);
+    const buttonX = bannerX + sx(52);
+
+    const playAgainBtn = this.createGameOverButton(buttonX + sx(75), buttonY, 'Play Again', () => {
       this.scene.start('GameScene', { gameMode: this.gameMode });
     });
+    playAgainBtn.setScrollFactor(0);
     playAgainBtn.setDepth(201);
 
-    const menuBtn = this.createGameOverButton(centerX + 80, centerY + 105, 'Main Menu', () => {
+    const menuBtn = this.createGameOverButton(buttonX + sx(75), buttonY + sx(32), 'Main Menu', () => {
       this.scene.start('MenuScene');
     });
+    menuBtn.setScrollFactor(0);
     menuBtn.setDepth(201);
   }
 
   private createGameOverButton(x: number, y: number, label: string, callback: () => void): Phaser.GameObjects.Container {
     const container = this.add.container(x, y);
-    const btnW = 130;
-    const btnH = 28;
+    const scale = Math.min(SCREEN_WIDTH / UI.BASE_WIDTH, SCREEN_HEIGHT / UI.BASE_HEIGHT);
+    const clampedScale = Math.max(0.75, Math.min(1.5, scale));
+    const btnW = 145 * clampedScale;
+    const btnH = 32 * clampedScale;
 
-    const bg = this.add.rectangle(0, 0, btnW, btnH, 0x222222, 0.9);
-    bg.setStrokeStyle(2, 0x444444);
-    bg.setInteractive({ useHandCursor: true });
+    let bg: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
+    if (this.textures.exists('ui_button_145x32')) {
+      bg = this.add.image(0, 0, 'ui_button_145x32');
+      bg.setDisplaySize(btnW, btnH);
+      bg.setInteractive({ useHandCursor: true });
+    } else {
+      const rect = this.add.rectangle(0, 0, btnW, btnH, 0x222222, 0.9);
+      rect.setStrokeStyle(2, 0x444444);
+      rect.setInteractive({ useHandCursor: true });
+      bg = rect;
+    }
 
     const text = this.add.text(0, 0, label, {
-      fontSize: '13px',
+      fontSize: `${Math.floor(13 * clampedScale)}px`,
       color: '#dcdcdc',
       fontFamily: 'Arial Black'
     }).setOrigin(0.5);
 
     bg.on('pointerover', () => {
-      bg.setFillStyle(0x404070, 0.9);
-      bg.setStrokeStyle(2, 0x8080b0);
       text.setColor('#ffffff');
+      if (bg instanceof Phaser.GameObjects.Rectangle) {
+        bg.setFillStyle(0x404070, 0.9);
+        bg.setStrokeStyle(2, 0x8080b0);
+      } else {
+        bg.setTint(0x8080ff);
+      }
     });
 
     bg.on('pointerout', () => {
-      bg.setFillStyle(0x222222, 0.9);
-      bg.setStrokeStyle(2, 0x444444);
       text.setColor('#dcdcdc');
+      if (bg instanceof Phaser.GameObjects.Rectangle) {
+        bg.setFillStyle(0x222222, 0.9);
+        bg.setStrokeStyle(2, 0x444444);
+      } else {
+        bg.clearTint();
+      }
     });
 
     bg.on('pointerdown', callback);

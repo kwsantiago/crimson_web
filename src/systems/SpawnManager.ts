@@ -205,23 +205,50 @@ export class SpawnManager {
   }
 
   private getSpawnInterval(): number {
-    const decay = this.timeElapsed / 60;
-    return Math.max(
-      this.modeConfig.minSpawnInterval,
-      this.modeConfig.baseSpawnInterval - decay * this.modeConfig.spawnDecayRate
-    );
+    if (this.gameMode === GameMode.RUSH) {
+      const decay = this.timeElapsed / 60;
+      return Math.max(
+        this.modeConfig.minSpawnInterval,
+        this.modeConfig.baseSpawnInterval - decay * this.modeConfig.spawnDecayRate
+      );
+    }
+    const elapsedMs = this.timeElapsed * 1000;
+    const intervalMs = 500 - Math.floor(elapsedMs / 1800);
+    return Math.max(0.001, intervalMs / 1000);
   }
 
   private spawnWave() {
     this.waveNumber++;
-    const baseCount = 3 + Math.floor(this.waveNumber * 0.5);
-    const count = Math.floor(baseCount * this.modeConfig.waveCountMultiplier);
 
-    for (let i = 0; i < count; i++) {
+    if (this.gameMode === GameMode.RUSH) {
+      const baseCount = 3 + Math.floor(this.waveNumber * 0.5);
+      const count = Math.floor(baseCount * this.modeConfig.waveCountMultiplier);
+      for (let i = 0; i < count; i++) {
+        const pos = this.getSpawnPosition();
+        const type = this.pickCreatureType();
+        this.spawnCreature(type, pos.x, pos.y);
+      }
+      return;
+    }
+
+    const elapsedMs = this.timeElapsed * 1000;
+    let intervalMs = 500 - Math.floor(elapsedMs / 1800);
+    let extraSpawns = 0;
+
+    if (intervalMs < 0) {
+      extraSpawns = Math.floor((1 - intervalMs) / 2);
+      intervalMs += extraSpawns * 2;
+    }
+
+    for (let i = 0; i < extraSpawns; i++) {
       const pos = this.getSpawnPosition();
       const type = this.pickCreatureType();
       this.spawnCreature(type, pos.x, pos.y);
     }
+
+    const pos = this.getSpawnPosition();
+    const type = this.pickCreatureType();
+    this.spawnCreature(type, pos.x, pos.y);
   }
 
   private pickCreatureType(): CreatureType {
@@ -321,34 +348,30 @@ export class SpawnManager {
   }
 
   private getSpawnPosition(): { x: number; y: number } {
-    const camera = this.scene.cameras.main;
     const edge = Phaser.Math.Between(0, 3);
-    const margin = 50;
+    const margin = 40;
 
     let x: number, y: number;
 
     switch (edge) {
       case 0:
-        x = camera.scrollX - margin;
-        y = Phaser.Math.Between(camera.scrollY, camera.scrollY + SCREEN_HEIGHT);
+        x = Phaser.Math.Between(0, WORLD_WIDTH);
+        y = -margin;
         break;
       case 1:
-        x = camera.scrollX + SCREEN_WIDTH + margin;
-        y = Phaser.Math.Between(camera.scrollY, camera.scrollY + SCREEN_HEIGHT);
+        x = Phaser.Math.Between(0, WORLD_WIDTH);
+        y = WORLD_HEIGHT + margin;
         break;
       case 2:
-        x = Phaser.Math.Between(camera.scrollX, camera.scrollX + SCREEN_WIDTH);
-        y = camera.scrollY - margin;
+        x = -margin;
+        y = Phaser.Math.Between(0, WORLD_HEIGHT);
         break;
       case 3:
       default:
-        x = Phaser.Math.Between(camera.scrollX, camera.scrollX + SCREEN_WIDTH);
-        y = camera.scrollY + SCREEN_HEIGHT + margin;
+        x = WORLD_WIDTH + margin;
+        y = Phaser.Math.Between(0, WORLD_HEIGHT);
         break;
     }
-
-    x = Phaser.Math.Clamp(x, 0, WORLD_WIDTH);
-    y = Phaser.Math.Clamp(y, 0, WORLD_HEIGHT);
 
     return { x, y };
   }

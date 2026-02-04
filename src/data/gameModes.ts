@@ -18,9 +18,9 @@ export const GAME_MODE_CONFIGS: Record<GameMode, GameModeConfig> = {
   [GameMode.SURVIVAL]: {
     name: 'Survival',
     description: 'Classic endless mode. Survive as long as you can!',
-    baseSpawnInterval: 2.0,
-    minSpawnInterval: 0.5,
-    spawnDecayRate: 0.3,
+    baseSpawnInterval: 0.5,
+    minSpawnInterval: 0.001,
+    spawnDecayRate: 0.0,
     xpMultiplier: 1.0,
     enemySpeedMultiplier: 1.0,
     waveCountMultiplier: 1.0

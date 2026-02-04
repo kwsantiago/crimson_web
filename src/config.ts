@@ -104,7 +104,13 @@ export const UI = {
     PANEL_Y: 210,
     PANEL_W: 512,
     PANEL_H: 256,
+    PANEL_OFFSET_X: 20,
+    PANEL_OFFSET_Y: -82,
     SLIDE_DURATION_MS: 250,
+    BANNER_W: 256,
+    BANNER_H: 64,
+    INPUT_BOX_W: 166,
+    INPUT_BOX_H: 18,
   },
 
   ANIM: {
