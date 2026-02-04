@@ -5,19 +5,49 @@ export enum PerkId {
   FASTLOADER = 3,
   LEAN_MEAN_EXP = 4,
   LONG_DISTANCE_RUNNER = 5,
+  PYROKINETIC = 6,
   INSTANT_WINNER = 7,
+  GRIM_DEAL = 8,
+  ALTERNATE_WEAPON = 9,
+  PLAGUEBEARER = 10,
+  EVIL_EYES = 11,
   AMMO_MANIAC = 12,
   REGENERATION = 13,
+  GREATER_REGENERATION = 14,
   FASTSHOT = 15,
+  DOCTOR = 16,
   THICK_SKINNED = 17,
+  MY_FAVOURITE_WEAPON = 18,
+  MAN_BOMB = 19,
   URANIUM_BULLETS = 20,
+  LIVING_FORTRESS = 21,
   BONUS_MAGNET = 22,
+  JINXED = 23,
+  MONSTER_VISION = 24,
+  PYROMANIAC = 25,
+  ION_GUN_MASTER = 26,
+  BARREL_GREASER = 27,
+  FATAL_LOTTERY = 28,
   BREATHING_ROOM = 29,
+  LIFELINE_50_50 = 30,
   RANDOM_WEAPON = 31,
+  INFERNAL_CONTRACT = 32,
+  DEATH_CLOCK = 33,
   BANDAGE = 34,
+  HOT_TEMPERED = 35,
+  FIRE_COUGH = 36,
+  STATIONARY_RELOADER = 37,
+  ANGRY_RELOADER = 38,
+  ANXIOUS_LOADER = 39,
   PERK_EXPERT = 40,
   PERK_MASTER = 41,
-  POISON_BULLETS = 46
+  RADIOACTIVE = 42,
+  REFLEX_BOOSTED = 43,
+  BONUS_ECONOMIST = 44,
+  AMMUNITION_WITHIN = 45,
+  POISON_BULLETS = 46,
+  REGRESSION_BULLETS = 47,
+  HIGHLANDER = 48
 }
 
 export interface PerkData {
@@ -64,11 +94,41 @@ export const PERKS: Record<PerkId, PerkData> = {
     description: '+50% movement speed',
     maxStacks: 1
   },
+  [PerkId.PYROKINETIC]: {
+    id: PerkId.PYROKINETIC,
+    name: 'Pyrokinetic',
+    description: 'Fire aura damages nearby enemies',
+    maxStacks: 3
+  },
   [PerkId.INSTANT_WINNER]: {
     id: PerkId.INSTANT_WINNER,
     name: 'Instant Winner',
     description: 'Gain 2500 XP immediately',
     maxStacks: 99
+  },
+  [PerkId.GRIM_DEAL]: {
+    id: PerkId.GRIM_DEAL,
+    name: 'Grim Deal',
+    description: 'Trade 25% max health for +5000 XP',
+    maxStacks: 3
+  },
+  [PerkId.ALTERNATE_WEAPON]: {
+    id: PerkId.ALTERNATE_WEAPON,
+    name: 'Alternate Weapon',
+    description: 'Carry a second weapon (press Q to swap)',
+    maxStacks: 1
+  },
+  [PerkId.PLAGUEBEARER]: {
+    id: PerkId.PLAGUEBEARER,
+    name: 'Plaguebearer',
+    description: 'Poison enemies that get close to you',
+    maxStacks: 3
+  },
+  [PerkId.EVIL_EYES]: {
+    id: PerkId.EVIL_EYES,
+    name: 'Evil Eyes',
+    description: 'Damage enemies by looking at them',
+    maxStacks: 3
   },
   [PerkId.AMMO_MANIAC]: {
     id: PerkId.AMMO_MANIAC,
@@ -82,10 +142,22 @@ export const PERKS: Record<PerkId, PerkData> = {
     description: 'Slowly regenerate health',
     maxStacks: 1
   },
+  [PerkId.GREATER_REGENERATION]: {
+    id: PerkId.GREATER_REGENERATION,
+    name: 'Greater Regeneration',
+    description: 'Faster health regeneration',
+    maxStacks: 1
+  },
   [PerkId.FASTSHOT]: {
     id: PerkId.FASTSHOT,
     name: 'Fastshot',
     description: '+25% fire rate',
+    maxStacks: 3
+  },
+  [PerkId.DOCTOR]: {
+    id: PerkId.DOCTOR,
+    name: 'Doctor',
+    description: 'Heal 1% of fire damage dealt',
     maxStacks: 3
   },
   [PerkId.THICK_SKINNED]: {
@@ -94,11 +166,29 @@ export const PERKS: Record<PerkId, PerkData> = {
     description: 'Take 33% less damage',
     maxStacks: 1
   },
+  [PerkId.MY_FAVOURITE_WEAPON]: {
+    id: PerkId.MY_FAVOURITE_WEAPON,
+    name: 'My Favourite Weapon',
+    description: 'Keep your current weapon forever',
+    maxStacks: 1
+  },
+  [PerkId.MAN_BOMB]: {
+    id: PerkId.MAN_BOMB,
+    name: 'Man Bomb',
+    description: 'Explode on death, then respawn once',
+    maxStacks: 1
+  },
   [PerkId.URANIUM_BULLETS]: {
     id: PerkId.URANIUM_BULLETS,
     name: 'Uranium Filled Bullets',
     description: '+25% bullet damage',
     maxStacks: 3
+  },
+  [PerkId.LIVING_FORTRESS]: {
+    id: PerkId.LIVING_FORTRESS,
+    name: 'Living Fortress',
+    description: "Can't move, but massive damage resist",
+    maxStacks: 1
   },
   [PerkId.BONUS_MAGNET]: {
     id: PerkId.BONUS_MAGNET,
@@ -106,10 +196,52 @@ export const PERKS: Record<PerkId, PerkData> = {
     description: 'Pickups are attracted to you',
     maxStacks: 1
   },
+  [PerkId.JINXED]: {
+    id: PerkId.JINXED,
+    name: 'Jinxed',
+    description: 'Random bad effects, but more XP',
+    maxStacks: 1
+  },
+  [PerkId.MONSTER_VISION]: {
+    id: PerkId.MONSTER_VISION,
+    name: 'Monster Vision',
+    description: 'See enemies through the fog',
+    maxStacks: 1
+  },
+  [PerkId.PYROMANIAC]: {
+    id: PerkId.PYROMANIAC,
+    name: 'Pyromaniac',
+    description: '+50% fire damage',
+    maxStacks: 1
+  },
+  [PerkId.ION_GUN_MASTER]: {
+    id: PerkId.ION_GUN_MASTER,
+    name: 'Ion Gun Master',
+    description: '+50% ion weapon damage',
+    maxStacks: 1
+  },
+  [PerkId.BARREL_GREASER]: {
+    id: PerkId.BARREL_GREASER,
+    name: 'Barrel Greaser',
+    description: 'Weapons never jam',
+    maxStacks: 1
+  },
+  [PerkId.FATAL_LOTTERY]: {
+    id: PerkId.FATAL_LOTTERY,
+    name: 'Fatal Lottery',
+    description: '50% chance: +10000 XP or instant death',
+    maxStacks: 1
+  },
   [PerkId.BREATHING_ROOM]: {
     id: PerkId.BREATHING_ROOM,
     name: 'Breathing Room',
-    description: 'Slow all enemies for 10 seconds',
+    description: 'Freeze all enemies for 10 seconds',
+    maxStacks: 99
+  },
+  [PerkId.LIFELINE_50_50]: {
+    id: PerkId.LIFELINE_50_50,
+    name: 'Lifeline 50/50',
+    description: 'Kill half enemies, or lose half health',
     maxStacks: 99
   },
   [PerkId.RANDOM_WEAPON]: {
@@ -118,11 +250,53 @@ export const PERKS: Record<PerkId, PerkData> = {
     description: 'Get a random weapon',
     maxStacks: 99
   },
+  [PerkId.INFERNAL_CONTRACT]: {
+    id: PerkId.INFERNAL_CONTRACT,
+    name: 'Infernal Contract',
+    description: '+3 levels, but health drops to 1',
+    maxStacks: 1
+  },
+  [PerkId.DEATH_CLOCK]: {
+    id: PerkId.DEATH_CLOCK,
+    name: 'Death Clock',
+    description: 'No healing, but +100% damage',
+    maxStacks: 1
+  },
   [PerkId.BANDAGE]: {
     id: PerkId.BANDAGE,
     name: 'Bandage',
     description: 'Heal 25% health immediately',
     maxStacks: 99
+  },
+  [PerkId.HOT_TEMPERED]: {
+    id: PerkId.HOT_TEMPERED,
+    name: 'Hot Tempered',
+    description: 'More damage when health is low',
+    maxStacks: 1
+  },
+  [PerkId.FIRE_COUGH]: {
+    id: PerkId.FIRE_COUGH,
+    name: 'Fire Cough',
+    description: 'Occasionally shoot fireballs when hit',
+    maxStacks: 1
+  },
+  [PerkId.STATIONARY_RELOADER]: {
+    id: PerkId.STATIONARY_RELOADER,
+    name: 'Stationary Reloader',
+    description: 'Faster reload when not moving',
+    maxStacks: 1
+  },
+  [PerkId.ANGRY_RELOADER]: {
+    id: PerkId.ANGRY_RELOADER,
+    name: 'Angry Reloader',
+    description: 'Faster reload when surrounded',
+    maxStacks: 1
+  },
+  [PerkId.ANXIOUS_LOADER]: {
+    id: PerkId.ANXIOUS_LOADER,
+    name: 'Anxious Loader',
+    description: 'Auto-reload when not firing',
+    maxStacks: 1
   },
   [PerkId.PERK_EXPERT]: {
     id: PerkId.PERK_EXPERT,
@@ -136,10 +310,46 @@ export const PERKS: Record<PerkId, PerkData> = {
     description: '6 perk choices instead of 5',
     maxStacks: 1
   },
+  [PerkId.RADIOACTIVE]: {
+    id: PerkId.RADIOACTIVE,
+    name: 'Radioactive',
+    description: 'Damage aura around you',
+    maxStacks: 3
+  },
+  [PerkId.REFLEX_BOOSTED]: {
+    id: PerkId.REFLEX_BOOSTED,
+    name: 'Reflex Boosted',
+    description: 'Brief slow-mo when nearly hit',
+    maxStacks: 1
+  },
+  [PerkId.BONUS_ECONOMIST]: {
+    id: PerkId.BONUS_ECONOMIST,
+    name: 'Bonus Economist',
+    description: 'Bonuses last 50% longer',
+    maxStacks: 1
+  },
+  [PerkId.AMMUNITION_WITHIN]: {
+    id: PerkId.AMMUNITION_WITHIN,
+    name: 'Ammunition Within',
+    description: 'Never need to reload',
+    maxStacks: 1
+  },
   [PerkId.POISON_BULLETS]: {
     id: PerkId.POISON_BULLETS,
     name: 'Poison Bullets',
     description: 'Bullets apply poison damage over time',
+    maxStacks: 1
+  },
+  [PerkId.REGRESSION_BULLETS]: {
+    id: PerkId.REGRESSION_BULLETS,
+    name: 'Regression Bullets',
+    description: 'Kills refund ammo',
+    maxStacks: 1
+  },
+  [PerkId.HIGHLANDER]: {
+    id: PerkId.HIGHLANDER,
+    name: 'Highlander',
+    description: 'Only one perk total, but 10x effective',
     maxStacks: 1
   }
 };
@@ -150,19 +360,44 @@ export const AVAILABLE_PERKS: PerkId[] = [
   PerkId.FASTLOADER,
   PerkId.LEAN_MEAN_EXP,
   PerkId.LONG_DISTANCE_RUNNER,
+  PerkId.PYROKINETIC,
   PerkId.INSTANT_WINNER,
+  PerkId.GRIM_DEAL,
+  PerkId.PLAGUEBEARER,
+  PerkId.EVIL_EYES,
   PerkId.AMMO_MANIAC,
   PerkId.REGENERATION,
+  PerkId.GREATER_REGENERATION,
   PerkId.FASTSHOT,
+  PerkId.DOCTOR,
   PerkId.THICK_SKINNED,
+  PerkId.MY_FAVOURITE_WEAPON,
+  PerkId.MAN_BOMB,
   PerkId.URANIUM_BULLETS,
   PerkId.BONUS_MAGNET,
+  PerkId.PYROMANIAC,
+  PerkId.ION_GUN_MASTER,
+  PerkId.FATAL_LOTTERY,
   PerkId.BREATHING_ROOM,
+  PerkId.LIFELINE_50_50,
   PerkId.RANDOM_WEAPON,
+  PerkId.INFERNAL_CONTRACT,
+  PerkId.DEATH_CLOCK,
   PerkId.BANDAGE,
+  PerkId.HOT_TEMPERED,
+  PerkId.FIRE_COUGH,
+  PerkId.STATIONARY_RELOADER,
+  PerkId.ANGRY_RELOADER,
+  PerkId.ANXIOUS_LOADER,
   PerkId.PERK_EXPERT,
   PerkId.PERK_MASTER,
-  PerkId.POISON_BULLETS
+  PerkId.RADIOACTIVE,
+  PerkId.REFLEX_BOOSTED,
+  PerkId.BONUS_ECONOMIST,
+  PerkId.AMMUNITION_WITHIN,
+  PerkId.POISON_BULLETS,
+  PerkId.REGRESSION_BULLETS,
+  PerkId.HIGHLANDER
 ];
 
 export function getPerkData(id: PerkId): PerkData {

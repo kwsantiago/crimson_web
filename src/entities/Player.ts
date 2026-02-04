@@ -84,11 +84,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.updateMuzzleFlash(delta);
     this.updateShieldVisual();
 
-    if (this.perkManager.hasRegeneration()) {
+    const regenRate = this.perkManager.getRegenRate();
+    if (regenRate > 0 && this.perkManager.canHeal()) {
       this.regenTimer += dt;
       if (this.regenTimer >= 1.0) {
         this.regenTimer = 0;
-        this.heal(1);
+        this.heal(regenRate);
       }
     }
 
@@ -212,6 +213,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   heal(amount: number) {
+    if (!this.perkManager.canHeal()) return;
     this.health = Math.min(this.maxHealth, this.health + amount);
   }
 
@@ -220,15 +222,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   activateSpeedBoost(duration: number) {
-    this.speedBoostTimer = duration;
+    const multiplier = this.perkManager.getBonusDurationMultiplier();
+    this.speedBoostTimer = duration * multiplier;
   }
 
   activateShield(duration: number) {
-    this.shieldTimer = duration;
+    const multiplier = this.perkManager.getBonusDurationMultiplier();
+    this.shieldTimer = duration * multiplier;
   }
 
   activateReflexBoost(duration: number) {
-    this.reflexBoostTimer = duration;
+    const multiplier = this.perkManager.getBonusDurationMultiplier();
+    this.reflexBoostTimer = duration * multiplier;
   }
 
   hasActiveShield(): boolean {

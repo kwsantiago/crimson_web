@@ -6,8 +6,10 @@ import { Bonus } from '../entities/Bonus';
 import { SpawnManager } from '../systems/SpawnManager';
 import { BonusManager } from '../systems/BonusManager';
 import { PerkSelector } from '../ui/PerkSelector';
+import { HighScoreManager } from '../systems/HighScoreManager';
 import { CreatureType } from '../data/creatures';
 import { PerkId } from '../data/perks';
+import { ProjectileType, WEAPONS } from '../data/weapons';
 import {
   WORLD_WIDTH,
   WORLD_HEIGHT,
@@ -25,6 +27,7 @@ export class GameScene extends Phaser.Scene {
   private spawnManager!: SpawnManager;
   private bonusManager!: BonusManager;
   private perkSelector!: PerkSelector;
+  private highScoreManager!: HighScoreManager;
   private bloodDecals!: Phaser.GameObjects.Group;
   private healthBar!: Phaser.GameObjects.Graphics;
   private xpBar!: Phaser.GameObjects.Graphics;
@@ -42,6 +45,8 @@ export class GameScene extends Phaser.Scene {
   private maxBloodDecals: number = 100;
   private pendingPerks: number = 0;
   private perkKey!: Phaser.Input.Keyboard.Key;
+  private gameStartTime: number = 0;
+  private explosionEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
 
   constructor() {
     super('GameScene');
@@ -51,6 +56,9 @@ export class GameScene extends Phaser.Scene {
     this.gameOver = false;
     this.killCount = 0;
     this.pendingPerks = 0;
+    this.gameStartTime = Date.now();
+
+    this.highScoreManager = new HighScoreManager();
 
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
@@ -61,12 +69,12 @@ export class GameScene extends Phaser.Scene {
 
     this.projectiles = this.physics.add.group({
       classType: Projectile,
-      maxSize: 200,
+      maxSize: 500,
       runChildUpdate: true
     });
 
     this.enemyProjectiles = this.physics.add.group({
-      maxSize: 50,
+      maxSize: 100,
       runChildUpdate: true
     });
 
@@ -91,7 +99,13 @@ export class GameScene extends Phaser.Scene {
       onXpGain: (amount) => this.player.addXp(amount),
       onWeaponChange: (index) => this.player.weaponManager.switchWeapon(index),
       onHeal: (amount) => this.player.heal(amount),
-      onFreezeEnemies: (duration) => this.freezeAllEnemies(duration)
+      onFreezeEnemies: (duration) => this.freezeAllEnemies(duration),
+      onKillHalfEnemies: () => this.killHalfEnemies(),
+      onLoseHalfHealth: () => this.player.takeDamage(this.player.health / 2),
+      onInstantDeath: () => this.player.takeDamage(9999),
+      onAddPendingPerks: (count) => { this.pendingPerks += count; },
+      onSetHealth: (health) => { this.player.health = health; },
+      onReduceMaxHealth: (mult) => { this.player.maxHealth *= mult; }
     });
 
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
@@ -114,6 +128,11 @@ export class GameScene extends Phaser.Scene {
 
     this.perkKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.P);
 
+    this.setupCollisions();
+    this.createHUD();
+  }
+
+  private setupCollisions() {
     this.physics.add.overlap(
       this.projectiles,
       this.creatures,
@@ -145,8 +164,6 @@ export class GameScene extends Phaser.Scene {
       undefined,
       this
     );
-
-    this.createHUD();
   }
 
   private createBackground() {
@@ -185,6 +202,15 @@ export class GameScene extends Phaser.Scene {
       emitting: false
     });
     this.bloodEmitter.setDepth(15);
+
+    this.explosionEmitter = this.add.particles(0, 0, 'explosion', {
+      speed: { min: 20, max: 80 },
+      scale: { start: 1, end: 0 },
+      lifespan: 500,
+      quantity: 1,
+      emitting: false
+    });
+    this.explosionEmitter.setDepth(16);
   }
 
   private createHUD() {
@@ -232,7 +258,7 @@ export class GameScene extends Phaser.Scene {
       fontFamily: 'Arial Black'
     }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setVisible(false);
 
-    this.add.text(16, 16, 'Weapons: 1-5', {
+    this.add.text(16, 16, 'Weapons: 1-9, 0', {
       fontSize: '12px',
       color: '#888888',
       fontFamily: 'Arial'
@@ -254,7 +280,7 @@ export class GameScene extends Phaser.Scene {
     this.healthBar.fillStyle(0x440000, 1);
     this.healthBar.fillRect(16, SCREEN_HEIGHT - 32, 150, 16);
     this.healthBar.fillStyle(0xff0000, 1);
-    const healthWidth = (this.player.health / this.player.maxHealth) * 150;
+    const healthWidth = Math.max(0, (this.player.health / this.player.maxHealth) * 150);
     this.healthBar.fillRect(16, SCREEN_HEIGHT - 32, healthWidth, 16);
 
     this.xpBar.clear();
@@ -393,6 +419,12 @@ export class GameScene extends Phaser.Scene {
 
     this.hitSparkEmitter.emitParticleAt(proj.x, proj.y);
 
+    if (proj.isExplosive) {
+      this.createExplosion(proj.x, proj.y, proj.explosionRadius, proj.damage);
+      proj.destroy();
+      return;
+    }
+
     const applyPoison = proj.isPoisoned;
     const killed = enemy.takeDamage(proj.damage, applyPoison);
 
@@ -401,22 +433,51 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (killed) {
-      this.player.addXp(enemy.xpValue);
-      this.killCount++;
-
-      const bloodyMess = this.player.perkManager.hasBloodyMess();
-      this.spawnBloodEffect(enemy.x, enemy.y, bloodyMess);
-      this.spawnBloodDecal(enemy.x, enemy.y, bloodyMess);
-
-      if (enemy.spawnsOnDeath && enemy.spawnCount > 0) {
-        this.spawnManager.spawnBabySpiders(enemy.x, enemy.y, enemy.spawnCount);
-      }
-
-      this.bonusManager.trySpawnBonus(enemy.x, enemy.y);
-      this.spawnXpOrb(enemy.x, enemy.y);
+      this.onCreatureKilled(enemy);
     } else {
       this.bloodEmitter.emitParticleAt(enemy.x, enemy.y, 3);
     }
+  }
+
+  private createExplosion(x: number, y: number, radius: number, damage: number) {
+    this.explosionEmitter.emitParticleAt(x, y, 3);
+    this.cameras.main.shake(200, 0.015);
+    this.cameras.main.flash(100, 255, 200, 100, false);
+
+    this.creatures.getChildren().forEach((creature) => {
+      const c = creature as Creature;
+      if (!c.active) return;
+
+      const dx = c.x - x;
+      const dy = c.y - y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < radius) {
+        const falloff = 1 - (dist / radius);
+        const explosionDamage = damage * falloff;
+        const killed = c.takeDamage(explosionDamage);
+
+        if (killed) {
+          this.onCreatureKilled(c);
+        }
+      }
+    });
+  }
+
+  private onCreatureKilled(enemy: Creature) {
+    this.player.addXp(enemy.xpValue);
+    this.killCount++;
+
+    const bloodyMess = this.player.perkManager.hasBloodyMess();
+    this.spawnBloodEffect(enemy.x, enemy.y, bloodyMess);
+    this.spawnBloodDecal(enemy.x, enemy.y, bloodyMess);
+
+    if (enemy.spawnsOnDeath && enemy.spawnCount > 0) {
+      this.spawnManager.spawnBabySpiders(enemy.x, enemy.y, enemy.spawnCount);
+    }
+
+    this.bonusManager.trySpawnBonus(enemy.x, enemy.y);
+    this.spawnXpOrb(enemy.x, enemy.y);
   }
 
   private onPlayerHitCreature(
@@ -437,6 +498,11 @@ export class GameScene extends Phaser.Scene {
       p.x += (dx / dist) * 5;
       p.y += (dy / dist) * 5;
     }
+
+    if (enemy.damage > 0) {
+      this.cameras.main.shake(50, 0.005);
+      this.cameras.main.flash(50, 255, 0, 0, false);
+    }
   }
 
   private onEnemyBulletHitPlayer(
@@ -450,6 +516,8 @@ export class GameScene extends Phaser.Scene {
 
     p.takeDamage(bullet.damage || 8);
     this.hitSparkEmitter.emitParticleAt(bullet.x, bullet.y);
+    this.cameras.main.shake(50, 0.005);
+    this.cameras.main.flash(50, 255, 0, 0, false);
 
     bullet.setActive(false);
     bullet.setVisible(false);
@@ -465,6 +533,7 @@ export class GameScene extends Phaser.Scene {
     if (!b.active) return;
 
     this.bonusManager.collectBonus(b);
+    this.cameras.main.flash(100, 100, 255, 100, false);
   }
 
   private spawnBloodEffect(x: number, y: number, extraBlood: boolean = false) {
@@ -538,6 +607,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.cameras.main.flash(100, 255, 217, 61, false);
+    this.cameras.main.shake(100, 0.01);
   }
 
   private freezeAllEnemies(duration: number) {
@@ -549,10 +619,25 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.cameras.main.flash(200, 100, 200, 255, false);
+    this.cameras.main.shake(100, 0.005);
+  }
+
+  private killHalfEnemies() {
+    const activeCreatures = this.creatures.getChildren().filter(c => (c as Creature).active);
+    const halfCount = Math.floor(activeCreatures.length / 2);
+
+    for (let i = 0; i < halfCount; i++) {
+      const c = activeCreatures[i] as Creature;
+      this.onCreatureKilled(c);
+      c.takeDamage(9999);
+    }
+
+    this.cameras.main.shake(200, 0.02);
+    this.cameras.main.flash(200, 255, 255, 100, false);
   }
 
   private nukeAllEnemies() {
-    this.cameras.main.shake(300, 0.02);
+    this.cameras.main.shake(300, 0.03);
     this.cameras.main.flash(300, 255, 255, 200, false);
 
     this.creatures.getChildren().forEach((creature) => {
@@ -570,6 +655,13 @@ export class GameScene extends Phaser.Scene {
   private handleGameOver() {
     this.gameOver = true;
 
+    const timePlayed = Date.now() - this.gameStartTime;
+    const { rank, isHighScore } = this.highScoreManager.addScore(
+      this.killCount,
+      this.player.level,
+      timePlayed
+    );
+
     const centerX = this.cameras.main.scrollX + SCREEN_WIDTH / 2;
     const centerY = this.cameras.main.scrollY + SCREEN_HEIGHT / 2;
 
@@ -582,33 +674,48 @@ export class GameScene extends Phaser.Scene {
       0.7
     ).setDepth(200);
 
-    this.add.text(centerX, centerY - 50, 'GAME OVER', {
+    this.add.text(centerX, centerY - 80, 'GAME OVER', {
       fontSize: '48px',
       color: '#ff6b6b',
       fontFamily: 'Arial Black'
     }).setOrigin(0.5).setDepth(201);
 
-    this.add.text(centerX, centerY + 20, `Kills: ${this.killCount}`, {
-      fontSize: '24px',
-      color: '#ffffff',
-      fontFamily: 'Arial'
+    const score = this.killCount * 100 + this.player.level * 500 + Math.floor(timePlayed / 100);
+    this.add.text(centerX, centerY - 20, `Score: ${score}`, {
+      fontSize: '28px',
+      color: '#ffd93d',
+      fontFamily: 'Arial Black'
     }).setOrigin(0.5).setDepth(201);
 
-    this.add.text(centerX, centerY + 60, `Level: ${this.player.level}`, {
-      fontSize: '24px',
-      color: '#ffffff',
-      fontFamily: 'Arial'
-    }).setOrigin(0.5).setDepth(201);
+    if (isHighScore) {
+      this.add.text(centerX, centerY + 20, `NEW HIGH SCORE! Rank #${rank}`, {
+        fontSize: '20px',
+        color: '#00ff00',
+        fontFamily: 'Arial Black'
+      }).setOrigin(0.5).setDepth(201);
+    }
 
-    this.add.text(centerX, centerY + 120, 'Click to restart', {
+    this.add.text(centerX, centerY + 60, `Kills: ${this.killCount}  |  Level: ${this.player.level}`, {
       fontSize: '18px',
+      color: '#ffffff',
+      fontFamily: 'Arial'
+    }).setOrigin(0.5).setDepth(201);
+
+    this.add.text(centerX, centerY + 90, `Time: ${this.highScoreManager.formatTime(timePlayed)}`, {
+      fontSize: '18px',
+      color: '#ffffff',
+      fontFamily: 'Arial'
+    }).setOrigin(0.5).setDepth(201);
+
+    this.add.text(centerX, centerY + 140, 'Click to return to menu', {
+      fontSize: '16px',
       color: '#888888',
       fontFamily: 'Arial'
     }).setOrigin(0.5).setDepth(201);
 
     this.time.delayedCall(500, () => {
       this.input.once('pointerdown', () => {
-        this.scene.restart();
+        this.scene.start('MenuScene');
       });
     });
   }

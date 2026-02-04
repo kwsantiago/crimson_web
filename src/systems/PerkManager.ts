@@ -1,16 +1,29 @@
 import { PerkId, PERKS, AVAILABLE_PERKS, getPerkData } from '../data/perks';
-import { WEAPONS } from '../data/weapons';
+import { WEAPONS, ProjectileType } from '../data/weapons';
 
 export interface PerkCounts {
   [key: number]: number;
 }
 
+export interface PerkCallbacks {
+  onXpGain?: (amount: number) => void;
+  onWeaponChange?: (weaponIndex: number) => void;
+  onHeal?: (amount: number) => void;
+  onFreezeEnemies?: (duration: number) => void;
+  onKillHalfEnemies?: () => void;
+  onLoseHalfHealth?: () => void;
+  onInstantDeath?: () => void;
+  onAddPendingPerks?: (count: number) => void;
+  onSetHealth?: (health: number) => void;
+  onReduceMaxHealth?: (multiplier: number) => void;
+}
+
 export class PerkManager {
   private perkCounts: PerkCounts = {};
-  private onXpGain?: (amount: number) => void;
-  private onWeaponChange?: (weaponIndex: number) => void;
-  private onHeal?: (amount: number) => void;
-  private onFreezeEnemies?: (duration: number) => void;
+  private callbacks: PerkCallbacks = {};
+  private highlander: boolean = false;
+  private deathClock: boolean = false;
+  private manBombUsed: boolean = false;
 
   constructor() {
     for (const perkId of Object.values(PerkId)) {
@@ -20,16 +33,8 @@ export class PerkManager {
     }
   }
 
-  setCallbacks(callbacks: {
-    onXpGain?: (amount: number) => void;
-    onWeaponChange?: (weaponIndex: number) => void;
-    onHeal?: (amount: number) => void;
-    onFreezeEnemies?: (duration: number) => void;
-  }) {
-    this.onXpGain = callbacks.onXpGain;
-    this.onWeaponChange = callbacks.onWeaponChange;
-    this.onHeal = callbacks.onHeal;
-    this.onFreezeEnemies = callbacks.onFreezeEnemies;
+  setCallbacks(callbacks: PerkCallbacks) {
+    this.callbacks = { ...this.callbacks, ...callbacks };
   }
 
   getPerkCount(perkId: PerkId): number {
@@ -41,8 +46,22 @@ export class PerkManager {
   }
 
   canTakePerk(perkId: PerkId): boolean {
+    if (this.highlander && this.getTotalPerkCount() > 0 && perkId !== PerkId.HIGHLANDER) {
+      return false;
+    }
+
     const data = getPerkData(perkId);
     return this.getPerkCount(perkId) < data.maxStacks;
+  }
+
+  getTotalPerkCount(): number {
+    let total = 0;
+    for (const perkId of Object.values(PerkId)) {
+      if (typeof perkId === 'number' && perkId !== PerkId.ANTIPERK) {
+        total += this.perkCounts[perkId] || 0;
+      }
+    }
+    return total;
   }
 
   applyPerk(perkId: PerkId): boolean {
@@ -54,15 +73,15 @@ export class PerkManager {
 
     switch (perkId) {
       case PerkId.INSTANT_WINNER:
-        this.onXpGain?.(2500);
+        this.callbacks.onXpGain?.(2500);
         break;
 
       case PerkId.BANDAGE:
-        this.onHeal?.(25);
+        this.callbacks.onHeal?.(25);
         break;
 
       case PerkId.BREATHING_ROOM:
-        this.onFreezeEnemies?.(10);
+        this.callbacks.onFreezeEnemies?.(10);
         break;
 
       case PerkId.RANDOM_WEAPON:
@@ -71,7 +90,45 @@ export class PerkManager {
         do {
           newIndex = Math.floor(Math.random() * WEAPONS.length);
         } while (newIndex === currentWeaponIndex && WEAPONS.length > 1);
-        this.onWeaponChange?.(newIndex);
+        this.callbacks.onWeaponChange?.(newIndex);
+        break;
+
+      case PerkId.GRIM_DEAL:
+        this.callbacks.onReduceMaxHealth?.(0.75);
+        this.callbacks.onXpGain?.(5000);
+        break;
+
+      case PerkId.FATAL_LOTTERY:
+        if (Math.random() < 0.5) {
+          this.callbacks.onXpGain?.(10000);
+        } else {
+          this.callbacks.onInstantDeath?.();
+        }
+        break;
+
+      case PerkId.LIFELINE_50_50:
+        if (Math.random() < 0.5) {
+          this.callbacks.onKillHalfEnemies?.();
+        } else {
+          this.callbacks.onLoseHalfHealth?.();
+        }
+        break;
+
+      case PerkId.INFERNAL_CONTRACT:
+        this.callbacks.onAddPendingPerks?.(3);
+        this.callbacks.onSetHealth?.(1);
+        break;
+
+      case PerkId.DEATH_CLOCK:
+        this.deathClock = true;
+        break;
+
+      case PerkId.HIGHLANDER:
+        this.highlander = true;
+        break;
+
+      case PerkId.MAN_BOMB:
+        this.manBombUsed = false;
         break;
     }
 
@@ -92,48 +149,81 @@ export class PerkManager {
     return shuffled.slice(0, numChoices);
   }
 
+  getEffectiveStacks(perkId: PerkId): number {
+    const base = this.getPerkCount(perkId);
+    if (this.highlander && base > 0) {
+      return base * 10;
+    }
+    return base;
+  }
+
   getSpreadMultiplier(): number {
-    const count = this.getPerkCount(PerkId.SHARPSHOOTER);
+    const count = this.getEffectiveStacks(PerkId.SHARPSHOOTER);
     return Math.pow(0.5, count);
   }
 
   getReloadMultiplier(): number {
-    const count = this.getPerkCount(PerkId.FASTLOADER);
+    const count = this.getEffectiveStacks(PerkId.FASTLOADER);
     return Math.pow(0.75, count);
   }
 
   getSpeedMultiplier(): number {
-    if (this.hasPerk(PerkId.LONG_DISTANCE_RUNNER)) return 1.5;
+    if (this.hasPerk(PerkId.LIVING_FORTRESS)) return 0;
+    if (this.hasPerk(PerkId.LONG_DISTANCE_RUNNER)) {
+      return this.highlander ? 6.0 : 1.5;
+    }
     return 1.0;
   }
 
   getFireRateMultiplier(): number {
-    const count = this.getPerkCount(PerkId.FASTSHOT);
+    const count = this.getEffectiveStacks(PerkId.FASTSHOT);
     return Math.pow(0.75, count);
   }
 
   getDamageReduction(): number {
-    if (this.hasPerk(PerkId.THICK_SKINNED)) return 0.67;
+    if (this.hasPerk(PerkId.LIVING_FORTRESS)) {
+      return this.highlander ? 0.03 : 0.1;
+    }
+    if (this.hasPerk(PerkId.THICK_SKINNED)) {
+      return this.highlander ? 0.03 : 0.67;
+    }
     return 1.0;
   }
 
   getBulletDamageMultiplier(): number {
-    const count = this.getPerkCount(PerkId.URANIUM_BULLETS);
-    return 1.0 + count * 0.25;
+    const count = this.getEffectiveStacks(PerkId.URANIUM_BULLETS);
+    let multiplier = 1.0 + count * 0.25;
+
+    if (this.deathClock) {
+      multiplier *= 2.0;
+    }
+
+    return multiplier;
   }
 
   getClipSizeMultiplier(): number {
-    const count = this.getPerkCount(PerkId.AMMO_MANIAC);
+    const count = this.getEffectiveStacks(PerkId.AMMO_MANIAC);
     return 1.0 + count * 0.5;
   }
 
   getPassiveXpPerSecond(): number {
-    const count = this.getPerkCount(PerkId.LEAN_MEAN_EXP);
+    const count = this.getEffectiveStacks(PerkId.LEAN_MEAN_EXP);
     return count * 10;
   }
 
   hasRegeneration(): boolean {
-    return this.hasPerk(PerkId.REGENERATION);
+    return this.hasPerk(PerkId.REGENERATION) || this.hasPerk(PerkId.GREATER_REGENERATION);
+  }
+
+  getRegenRate(): number {
+    if (this.deathClock) return 0;
+    if (this.hasPerk(PerkId.GREATER_REGENERATION)) {
+      return this.highlander ? 30 : 3;
+    }
+    if (this.hasPerk(PerkId.REGENERATION)) {
+      return this.highlander ? 10 : 1;
+    }
+    return 0;
   }
 
   hasBonusMagnet(): boolean {
@@ -148,11 +238,120 @@ export class PerkManager {
     return this.hasPerk(PerkId.POISON_BULLETS);
   }
 
+  hasAmmunitionWithin(): boolean {
+    return this.hasPerk(PerkId.AMMUNITION_WITHIN);
+  }
+
+  canHeal(): boolean {
+    return !this.deathClock;
+  }
+
+  hasManBomb(): boolean {
+    return this.hasPerk(PerkId.MAN_BOMB) && !this.manBombUsed;
+  }
+
+  useManBomb(): boolean {
+    if (this.hasManBomb()) {
+      this.manBombUsed = true;
+      return true;
+    }
+    return false;
+  }
+
+  getPyrokineticDamage(): number {
+    const count = this.getEffectiveStacks(PerkId.PYROKINETIC);
+    return count * 5;
+  }
+
+  getRadioactiveDamage(): number {
+    const count = this.getEffectiveStacks(PerkId.RADIOACTIVE);
+    return count * 3;
+  }
+
+  getPlaguebearerDamage(): number {
+    const count = this.getEffectiveStacks(PerkId.PLAGUEBEARER);
+    return count * 2;
+  }
+
+  getEvilEyesDamage(): number {
+    const count = this.getEffectiveStacks(PerkId.EVIL_EYES);
+    return count * 4;
+  }
+
+  hasHotTempered(): boolean {
+    return this.hasPerk(PerkId.HOT_TEMPERED);
+  }
+
+  getHotTemperedMultiplier(healthPercent: number): number {
+    if (!this.hasHotTempered()) return 1.0;
+    if (healthPercent > 0.5) return 1.0;
+    const boost = (1 - healthPercent * 2) * (this.highlander ? 5.0 : 1.0);
+    return 1.0 + boost;
+  }
+
+  hasFireCough(): boolean {
+    return this.hasPerk(PerkId.FIRE_COUGH);
+  }
+
+  hasAnxiousLoader(): boolean {
+    return this.hasPerk(PerkId.ANXIOUS_LOADER);
+  }
+
+  hasStationaryReloader(): boolean {
+    return this.hasPerk(PerkId.STATIONARY_RELOADER);
+  }
+
+  hasRegressionBullets(): boolean {
+    return this.hasPerk(PerkId.REGRESSION_BULLETS);
+  }
+
+  hasMyFavouriteWeapon(): boolean {
+    return this.hasPerk(PerkId.MY_FAVOURITE_WEAPON);
+  }
+
+  getBonusDurationMultiplier(): number {
+    if (this.hasPerk(PerkId.BONUS_ECONOMIST)) {
+      return this.highlander ? 3.0 : 1.5;
+    }
+    return 1.0;
+  }
+
+  getFireDamageMultiplier(): number {
+    if (this.hasPerk(PerkId.PYROMANIAC)) {
+      return this.highlander ? 6.0 : 1.5;
+    }
+    return 1.0;
+  }
+
+  getIonDamageMultiplier(): number {
+    if (this.hasPerk(PerkId.ION_GUN_MASTER)) {
+      return this.highlander ? 6.0 : 1.5;
+    }
+    return 1.0;
+  }
+
+  getDamageMultiplier(projectileType: ProjectileType): number {
+    let mult = 1.0;
+
+    if (projectileType === ProjectileType.BULLET) {
+      mult *= this.getBulletDamageMultiplier();
+    } else if (projectileType === ProjectileType.FLAME) {
+      mult *= this.getFireDamageMultiplier();
+    } else if (projectileType === ProjectileType.ION) {
+      mult *= this.getIonDamageMultiplier();
+    }
+
+    return mult;
+  }
+
   reset() {
     for (const perkId of Object.values(PerkId)) {
       if (typeof perkId === 'number') {
         this.perkCounts[perkId] = 0;
       }
     }
+    this.highlander = false;
+    this.deathClock = false;
+    this.manBombUsed = false;
   }
 }

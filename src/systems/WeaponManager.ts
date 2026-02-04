@@ -7,7 +7,7 @@ export class WeaponManager {
   private scene: Phaser.Scene;
   private projectiles: Phaser.Physics.Arcade.Group;
   private perkManager?: PerkManager;
-  private _currentWeaponIndex: number = 0;
+  private _currentWeaponIndex: number = 1;
   private ammo: number;
   private reloadTimer: number = 0;
   private shotCooldown: number = 0;
@@ -29,7 +29,12 @@ export class WeaponManager {
       keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
       keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
       keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR),
-      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE)
+      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE),
+      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SIX),
+      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SEVEN),
+      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.EIGHT),
+      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NINE),
+      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ZERO)
     ];
   }
 
@@ -81,11 +86,8 @@ export class WeaponManager {
 
   private getDamage(): number {
     const base = this.currentWeapon.damage;
-    if (this.currentWeapon.projectileType === ProjectileType.BULLET) {
-      const multiplier = this.perkManager?.getBulletDamageMultiplier() ?? 1.0;
-      return Math.floor(base * multiplier);
-    }
-    return base;
+    const multiplier = this.perkManager?.getDamageMultiplier(this.currentWeapon.projectileType) ?? 1.0;
+    return Math.floor(base * multiplier);
   }
 
   update(delta: number) {
@@ -108,18 +110,24 @@ export class WeaponManager {
 
     for (let i = 0; i < this.numberKeys.length; i++) {
       if (Phaser.Input.Keyboard.JustDown(this.numberKeys[i])) {
-        this.switchWeapon(i);
+        const weaponIndex = i === 9 ? 0 : i + 1;
+        if (weaponIndex < WEAPONS.length) {
+          this.switchWeapon(weaponIndex);
+        }
       }
     }
   }
 
   canFire(): boolean {
+    if (this.perkManager?.hasAmmunitionWithin()) {
+      return this.shotCooldown <= 0 && !this.isReloading;
+    }
     return this.shotCooldown <= 0 && !this.isReloading && this.ammo > 0;
   }
 
   fire(x: number, y: number, angle: number, emitMuzzleFlash: () => void): boolean {
     if (!this.canFire()) {
-      if (this.ammo <= 0 && !this.isReloading) {
+      if (this.ammo <= 0 && !this.isReloading && !this.perkManager?.hasAmmunitionWithin()) {
         this.startReload();
       }
       return false;
@@ -143,11 +151,13 @@ export class WeaponManager {
       }
     }
 
-    this.ammo--;
+    if (!this.perkManager?.hasAmmunitionWithin()) {
+      this.ammo--;
+    }
     this.shotCooldown = this.getFireRate();
     emitMuzzleFlash();
 
-    if (this.ammo <= 0) {
+    if (this.ammo <= 0 && !this.perkManager?.hasAmmunitionWithin()) {
       this.startReload();
     }
 
@@ -170,10 +180,16 @@ export class WeaponManager {
     if (index < 0 || index >= WEAPONS.length) return;
     if (index === this._currentWeaponIndex) return;
 
+    if (this.perkManager?.hasMyFavouriteWeapon()) return;
+
     this._currentWeaponIndex = index;
     this.ammo = this.clipSize;
     this.isReloading = false;
     this.reloadTimer = 0;
     this.shotCooldown = 0;
+  }
+
+  refundAmmo(count: number = 1) {
+    this.ammo = Math.min(this.clipSize, this.ammo + count);
   }
 }
