@@ -7,6 +7,7 @@ import { SpawnManager } from '../systems/SpawnManager';
 import { BonusManager } from '../systems/BonusManager';
 import { PerkSelector } from '../ui/PerkSelector';
 import { HighScoreManager } from '../systems/HighScoreManager';
+import { GameMode, GAME_MODE_CONFIGS } from '../data/gameModes';
 import { CreatureType } from '../data/creatures';
 import { PerkId } from '../data/perks';
 import { ProjectileType, WEAPONS } from '../data/weapons';
@@ -17,6 +18,10 @@ import {
   SCREEN_HEIGHT,
   getXpForLevel
 } from '../config';
+
+interface GameSceneData {
+  gameMode?: GameMode;
+}
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
@@ -47,9 +52,15 @@ export class GameScene extends Phaser.Scene {
   private perkKey!: Phaser.Input.Keyboard.Key;
   private gameStartTime: number = 0;
   private explosionEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private gameMode: GameMode = GameMode.SURVIVAL;
+  private modeIndicator!: Phaser.GameObjects.Text;
 
   constructor() {
     super('GameScene');
+  }
+
+  init(data: GameSceneData) {
+    this.gameMode = data.gameMode || GameMode.SURVIVAL;
   }
 
   create() {
@@ -111,7 +122,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-    this.spawnManager = new SpawnManager(this, this.creatures, this.enemyProjectiles);
+    this.spawnManager = new SpawnManager(this, this.creatures, this.enemyProjectiles, this.gameMode);
     this.bonusManager = new BonusManager(this, this.bonuses, this.player);
     this.bonusManager.setCallbacks({
       onNuke: () => this.nukeAllEnemies(),
@@ -234,6 +245,14 @@ export class GameScene extends Phaser.Scene {
       fontFamily: 'Arial'
     }).setOrigin(1, 0).setScrollFactor(0).setDepth(100);
 
+    const modeConfig = GAME_MODE_CONFIGS[this.gameMode];
+    const modeColor = this.gameMode === GameMode.RUSH ? '#ff9f43' : '#4ecdc4';
+    this.modeIndicator = this.add.text(SCREEN_WIDTH - 16, 40, modeConfig.name.toUpperCase(), {
+      fontSize: '12px',
+      color: modeColor,
+      fontFamily: 'Arial Black'
+    }).setOrigin(1, 0).setScrollFactor(0).setDepth(100);
+
     this.weaponText = this.add.text(SCREEN_WIDTH - 16, SCREEN_HEIGHT - 48, 'Pistol', {
       fontSize: '14px',
       color: '#ffffff',
@@ -270,7 +289,7 @@ export class GameScene extends Phaser.Scene {
       fontFamily: 'Arial'
     }).setScrollFactor(0).setDepth(100);
 
-    this.powerupIcons = this.add.container(SCREEN_WIDTH - 40, 50);
+    this.powerupIcons = this.add.container(SCREEN_WIDTH - 40, 70);
     this.powerupIcons.setScrollFactor(0);
     this.powerupIcons.setDepth(100);
   }
@@ -465,7 +484,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onCreatureKilled(enemy: Creature) {
-    this.player.addXp(enemy.xpValue);
+    const xpMultiplier = this.spawnManager.getXpMultiplier();
+    this.player.addXp(Math.floor(enemy.xpValue * xpMultiplier));
     this.killCount++;
 
     const bloodyMess = this.player.perkManager.hasBloodyMess();
@@ -640,10 +660,11 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.shake(300, 0.03);
     this.cameras.main.flash(300, 255, 255, 200, false);
 
+    const xpMultiplier = this.spawnManager.getXpMultiplier();
     this.creatures.getChildren().forEach((creature) => {
       const c = creature as Creature;
       if (c.active) {
-        this.player.addXp(c.xpValue);
+        this.player.addXp(Math.floor(c.xpValue * xpMultiplier));
         this.killCount++;
         this.spawnBloodEffect(c.x, c.y, true);
         this.spawnBloodDecal(c.x, c.y, true);
@@ -659,7 +680,8 @@ export class GameScene extends Phaser.Scene {
     const { rank, isHighScore } = this.highScoreManager.addScore(
       this.killCount,
       this.player.level,
-      timePlayed
+      timePlayed,
+      this.gameMode
     );
 
     const centerX = this.cameras.main.scrollX + SCREEN_WIDTH / 2;
@@ -674,34 +696,43 @@ export class GameScene extends Phaser.Scene {
       0.7
     ).setDepth(200);
 
-    this.add.text(centerX, centerY - 80, 'GAME OVER', {
+    this.add.text(centerX, centerY - 100, 'GAME OVER', {
       fontSize: '48px',
       color: '#ff6b6b',
       fontFamily: 'Arial Black'
     }).setOrigin(0.5).setDepth(201);
 
+    const modeConfig = GAME_MODE_CONFIGS[this.gameMode];
+    const modeColor = this.gameMode === GameMode.RUSH ? '#ff9f43' : '#4ecdc4';
+    this.add.text(centerX, centerY - 55, modeConfig.name.toUpperCase() + ' MODE', {
+      fontSize: '18px',
+      color: modeColor,
+      fontFamily: 'Arial Black'
+    }).setOrigin(0.5).setDepth(201);
+
     const score = this.killCount * 100 + this.player.level * 500 + Math.floor(timePlayed / 100);
-    this.add.text(centerX, centerY - 20, `Score: ${score}`, {
+    const finalScore = this.gameMode === GameMode.RUSH ? Math.floor(score * 1.2) : score;
+    this.add.text(centerX, centerY - 15, `Score: ${finalScore}`, {
       fontSize: '28px',
       color: '#ffd93d',
       fontFamily: 'Arial Black'
     }).setOrigin(0.5).setDepth(201);
 
     if (isHighScore) {
-      this.add.text(centerX, centerY + 20, `NEW HIGH SCORE! Rank #${rank}`, {
+      this.add.text(centerX, centerY + 25, `NEW HIGH SCORE! Rank #${rank}`, {
         fontSize: '20px',
         color: '#00ff00',
         fontFamily: 'Arial Black'
       }).setOrigin(0.5).setDepth(201);
     }
 
-    this.add.text(centerX, centerY + 60, `Kills: ${this.killCount}  |  Level: ${this.player.level}`, {
+    this.add.text(centerX, centerY + 65, `Kills: ${this.killCount}  |  Level: ${this.player.level}`, {
       fontSize: '18px',
       color: '#ffffff',
       fontFamily: 'Arial'
     }).setOrigin(0.5).setDepth(201);
 
-    this.add.text(centerX, centerY + 90, `Time: ${this.highScoreManager.formatTime(timePlayed)}`, {
+    this.add.text(centerX, centerY + 95, `Time: ${this.highScoreManager.formatTime(timePlayed)}`, {
       fontSize: '18px',
       color: '#ffffff',
       fontFamily: 'Arial'

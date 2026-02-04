@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { Creature } from '../entities/Creature';
 import { CreatureType } from '../data/creatures';
+import { GameMode, GameModeConfig, GAME_MODE_CONFIGS } from '../data/gameModes';
 import { WORLD_WIDTH, WORLD_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT } from '../config';
 
 export class SpawnManager {
@@ -8,22 +9,26 @@ export class SpawnManager {
   private creatures: Phaser.Physics.Arcade.Group;
   private enemyProjectiles: Phaser.Physics.Arcade.Group;
   private spawnTimer: number = 0;
-  private baseSpawnInterval: number = 2.0;
-  private minSpawnInterval: number = 0.5;
   private waveNumber: number = 0;
   private timeElapsed: number = 0;
   private spawnStage: number = 0;
   private playerLevel: number = 1;
   private stageNotified: boolean[] = [];
+  private gameMode: GameMode = GameMode.SURVIVAL;
+  private modeConfig: GameModeConfig;
+  private rushSpawnTimer: number = 0;
 
   constructor(
     scene: Phaser.Scene,
     creatures: Phaser.Physics.Arcade.Group,
-    enemyProjectiles: Phaser.Physics.Arcade.Group
+    enemyProjectiles: Phaser.Physics.Arcade.Group,
+    gameMode: GameMode = GameMode.SURVIVAL
   ) {
     this.scene = scene;
     this.creatures = creatures;
     this.enemyProjectiles = enemyProjectiles;
+    this.gameMode = gameMode;
+    this.modeConfig = GAME_MODE_CONFIGS[gameMode];
     for (let i = 0; i < 15; i++) {
       this.stageNotified.push(false);
     }
@@ -35,11 +40,86 @@ export class SpawnManager {
     this.spawnTimer -= dt;
     this.playerLevel = playerLevel;
 
+    if (this.gameMode === GameMode.RUSH) {
+      this.updateRush(dt);
+    } else {
+      this.updateSurvival(dt);
+    }
+  }
+
+  private updateSurvival(dt: number) {
     this.updateStage();
 
     if (this.spawnTimer <= 0) {
       this.spawnWave();
       this.spawnTimer = this.getSpawnInterval();
+    }
+  }
+
+  private updateRush(dt: number) {
+    this.rushSpawnTimer -= dt;
+
+    if (this.rushSpawnTimer <= 0) {
+      this.spawnRushWave();
+      this.rushSpawnTimer = this.getSpawnInterval();
+    }
+
+    this.updateStage();
+  }
+
+  private spawnRushWave() {
+    const camera = this.scene.cameras.main;
+    const elapsedMs = this.timeElapsed * 1000;
+
+    const waveIntensity = Math.min(1.0, elapsedMs * 0.00000833 + 0.3);
+    const count = Math.floor(4 + waveIntensity * 8);
+
+    for (let i = 0; i < count; i++) {
+      const pos = this.getRushSpawnPosition(elapsedMs, i);
+      const type = this.pickRushCreatureType();
+      this.spawnCreature(type, pos.x, pos.y, true);
+    }
+  }
+
+  private getRushSpawnPosition(elapsedMs: number, index: number): { x: number; y: number } {
+    const camera = this.scene.cameras.main;
+
+    if (index % 2 === 0) {
+      return {
+        x: camera.scrollX + SCREEN_WIDTH + 64,
+        y: camera.scrollY + SCREEN_HEIGHT / 2 + Math.cos(elapsedMs * 0.001 + index) * 200
+      };
+    } else {
+      return {
+        x: camera.scrollX - 64,
+        y: camera.scrollY + SCREEN_HEIGHT / 2 + Math.sin(elapsedMs * 0.001 + index) * 200
+      };
+    }
+  }
+
+  private pickRushCreatureType(): CreatureType {
+    const roll = Math.random();
+    const intensity = Math.min(1.0, this.timeElapsed / 120);
+
+    if (intensity < 0.3) {
+      if (roll < 0.6) return CreatureType.ZOMBIE;
+      if (roll < 0.9) return CreatureType.FAST_ZOMBIE;
+      return CreatureType.SPIDER;
+    } else if (intensity < 0.6) {
+      if (roll < 0.3) return CreatureType.ZOMBIE;
+      if (roll < 0.5) return CreatureType.FAST_ZOMBIE;
+      if (roll < 0.7) return CreatureType.SPIDER;
+      if (roll < 0.85) return CreatureType.BIG_ZOMBIE;
+      return CreatureType.ALIEN;
+    } else {
+      if (roll < 0.15) return CreatureType.ZOMBIE;
+      if (roll < 0.3) return CreatureType.FAST_ZOMBIE;
+      if (roll < 0.45) return CreatureType.SPIDER;
+      if (roll < 0.6) return CreatureType.BIG_ZOMBIE;
+      if (roll < 0.7) return CreatureType.ALIEN;
+      if (roll < 0.8) return CreatureType.LIZARD;
+      if (roll < 0.9) return CreatureType.ALIEN_ELITE;
+      return CreatureType.LIZARD_SPITTER;
     }
   }
 
@@ -126,12 +206,16 @@ export class SpawnManager {
 
   private getSpawnInterval(): number {
     const decay = this.timeElapsed / 60;
-    return Math.max(this.minSpawnInterval, this.baseSpawnInterval - decay * 0.3);
+    return Math.max(
+      this.modeConfig.minSpawnInterval,
+      this.modeConfig.baseSpawnInterval - decay * this.modeConfig.spawnDecayRate
+    );
   }
 
   private spawnWave() {
     this.waveNumber++;
-    const count = 3 + Math.floor(this.waveNumber * 0.5);
+    const baseCount = 3 + Math.floor(this.waveNumber * 0.5);
+    const count = Math.floor(baseCount * this.modeConfig.waveCountMultiplier);
 
     for (let i = 0; i < count; i++) {
       const pos = this.getSpawnPosition();
@@ -216,8 +300,14 @@ export class SpawnManager {
     }
   }
 
-  private spawnCreature(type: CreatureType, x: number, y: number) {
+  private spawnCreature(type: CreatureType, x: number, y: number, applyRushModifiers: boolean = false) {
     const creature = new Creature(this.scene, x, y, type, this.enemyProjectiles);
+
+    if (applyRushModifiers || this.gameMode === GameMode.RUSH) {
+      creature.speed *= this.modeConfig.enemySpeedMultiplier;
+      creature.xpValue = Math.floor(creature.xpValue * this.modeConfig.xpMultiplier);
+    }
+
     this.creatures.add(creature);
   }
 
@@ -263,8 +353,17 @@ export class SpawnManager {
     return { x, y };
   }
 
+  getXpMultiplier(): number {
+    return this.modeConfig.xpMultiplier;
+  }
+
+  getGameMode(): GameMode {
+    return this.gameMode;
+  }
+
   reset() {
-    this.spawnTimer = 2.0;
+    this.spawnTimer = this.modeConfig.baseSpawnInterval;
+    this.rushSpawnTimer = this.modeConfig.baseSpawnInterval;
     this.waveNumber = 0;
     this.timeElapsed = 0;
     this.spawnStage = 0;
