@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Crimsonland clone built with Phaser 3 + TypeScript",
   "scripts": {
-    "fetch-assets": "curl -o public/crimson.paq https://paq.crimson.banteg.xyz/v1.9.93/crimson.paq",
+    "fetch-assets": "mkdir -p public && curl -o public/crimson.paq https://paq.crimson.banteg.xyz/v1.9.93/crimson.paq",
     "dev": "bun run fetch-assets && vite",
     "build": "bun run fetch-assets && tsc && vite build",
     "preview": "vite preview"
