@@ -20,6 +20,62 @@ import {
   UI
 } from '../config';
 
+const WEAPON_ICON_INDICES: Record<number, number> = {
+  0: 7,   // Fire Bullets -> Flamethrower icon
+  1: 0,   // Pistol
+  2: 1,   // Assault Rifle
+  3: 4,   // Submachine Gun
+  4: 3,   // Sawed-off Shotgun
+  5: 2,   // Jackhammer (Shotgun icon)
+  6: 7,   // Flamethrower
+  7: 8,   // Plasma Rifle
+  8: 9,   // Multi Plasma
+  9: 10,  // Plasma Minigun
+  10: 5,  // Gauss Gun
+  11: 11, // Rocket Launcher
+  12: 14, // Plasma Shotgun
+  13: 18, // Rocket Minigun
+  14: 21, // Ion Rifle
+  15: 22, // Ion Minigun
+  16: 23, // Ion Cannon
+  17: 31, // Ion Shotgun
+  18: 30, // Gauss Shotgun
+  19: 28, // Plasma Cannon
+  20: 25, // Blade Gun
+  21: 19, // Pulse Gun
+  22: 24, // Shrinkifier 5000
+  23: 29, // Splitter Gun
+  24: 53, // Nuke Launcher (placeholder)
+};
+
+const WEAPON_AMMO_CLASS: Record<number, number> = {
+  0: 1,   // Fire Bullets -> Fire
+  1: 0,   // Pistol -> Bullet
+  2: 0,   // Assault Rifle -> Bullet
+  3: 0,   // Submachine Gun -> Bullet
+  4: 0,   // Sawed-off Shotgun -> Bullet
+  5: 0,   // Jackhammer -> Bullet
+  6: 1,   // Flamethrower -> Fire
+  7: 3,   // Plasma Rifle -> Electric
+  8: 3,   // Multi Plasma -> Electric
+  9: 3,   // Plasma Minigun -> Electric
+  10: 0,  // Gauss Gun -> Bullet
+  11: 2,  // Rocket Launcher -> Rocket
+  12: 3,  // Plasma Shotgun -> Electric
+  13: 2,  // Rocket Minigun -> Rocket
+  14: 3,  // Ion Rifle -> Electric
+  15: 3,  // Ion Minigun -> Electric
+  16: 3,  // Ion Cannon -> Electric
+  17: 3,  // Ion Shotgun -> Electric
+  18: 0,  // Gauss Shotgun -> Bullet
+  19: 3,  // Plasma Cannon -> Electric
+  20: 0,  // Blade Gun -> Bullet
+  21: 3,  // Pulse Gun -> Electric
+  22: 3,  // Shrinkifier 5000 -> Electric
+  23: 3,  // Splitter Gun -> Electric
+  24: 2,  // Nuke Launcher -> Rocket
+};
+
 interface GameSceneData {
   gameMode?: GameMode;
 }
@@ -55,6 +111,16 @@ export class GameScene extends Phaser.Scene {
   private explosionEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private gameMode: GameMode = GameMode.SURVIVAL;
   private modeIndicator!: Phaser.GameObjects.Text;
+  private hudScale: number = 1;
+  private crosshair!: Phaser.GameObjects.Image;
+  private topBarSprite!: Phaser.GameObjects.Image;
+  private heartSprite!: Phaser.GameObjects.Image;
+  private healthBarBg!: Phaser.GameObjects.Image;
+  private healthBarFill!: Phaser.GameObjects.Image;
+  private weaponIcon!: Phaser.GameObjects.Image;
+  private ammoIndicators: Phaser.GameObjects.Image[] = [];
+  private xpPanelSprite!: Phaser.GameObjects.Image;
+  private elapsedMs: number = 0;
 
   constructor() {
     super('GameScene');
@@ -231,6 +297,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createHUD() {
+    this.hudScale = Math.min(
+      SCREEN_WIDTH / UI.HUD_BASE_WIDTH,
+      SCREEN_HEIGHT / UI.HUD_BASE_HEIGHT
+    );
+    this.hudScale = Math.max(0.75, Math.min(1.5, this.hudScale));
+
+    const sx = (v: number) => v * this.hudScale;
+
     this.healthBar = this.add.graphics();
     this.healthBar.setScrollFactor(0);
     this.healthBar.setDepth(100);
@@ -239,11 +313,59 @@ export class GameScene extends Phaser.Scene {
     this.xpBar.setScrollFactor(0);
     this.xpBar.setDepth(100);
 
-    this.levelText = this.add.text(8, 68, 'Lv 1', {
-      fontSize: '14px',
+    if (this.textures.exists('ui_gameTop')) {
+      this.topBarSprite = this.add.image(0, 0, 'ui_gameTop');
+      this.topBarSprite.setOrigin(0, 0);
+      this.topBarSprite.setScrollFactor(0);
+      this.topBarSprite.setDepth(99);
+      this.topBarSprite.setDisplaySize(sx(UI.HUD.TOP_BAR_SIZE.w), sx(UI.HUD.TOP_BAR_SIZE.h));
+      this.topBarSprite.setAlpha(UI.ALPHA.TOP_BAR);
+    }
+
+    if (this.textures.exists('ui_lifeHeart')) {
+      this.heartSprite = this.add.image(sx(UI.HUD.HEART_CENTER.x), sx(UI.HUD.HEART_CENTER.y), 'ui_lifeHeart');
+      this.heartSprite.setScrollFactor(0);
+      this.heartSprite.setDepth(101);
+      this.heartSprite.setAlpha(UI.ALPHA.ICON);
+    }
+
+    if (this.textures.exists('ui_indLife')) {
+      this.healthBarBg = this.add.image(sx(UI.HUD.HEALTH_BAR_POS.x), sx(UI.HUD.HEALTH_BAR_POS.y), 'ui_indLife');
+      this.healthBarBg.setOrigin(0, 0);
+      this.healthBarBg.setScrollFactor(0);
+      this.healthBarBg.setDepth(100);
+      this.healthBarBg.setDisplaySize(sx(UI.HUD.HEALTH_BAR_SIZE.w), sx(UI.HUD.HEALTH_BAR_SIZE.h));
+      this.healthBarBg.setAlpha(UI.ALPHA.HEALTH_BG);
+
+      this.healthBarFill = this.add.image(sx(UI.HUD.HEALTH_BAR_POS.x), sx(UI.HUD.HEALTH_BAR_POS.y), 'ui_indLife');
+      this.healthBarFill.setOrigin(0, 0);
+      this.healthBarFill.setScrollFactor(0);
+      this.healthBarFill.setDepth(101);
+      this.healthBarFill.setAlpha(UI.ALPHA.ICON);
+    }
+
+    if (this.textures.exists('ui_wicons')) {
+      this.weaponIcon = this.add.image(sx(UI.HUD.WEAPON_ICON_POS.x), sx(UI.HUD.WEAPON_ICON_POS.y), 'ui_wicons');
+      this.weaponIcon.setOrigin(0, 0);
+      this.weaponIcon.setScrollFactor(0);
+      this.weaponIcon.setDepth(101);
+      this.weaponIcon.setDisplaySize(sx(UI.HUD.WEAPON_ICON_SIZE.w), sx(UI.HUD.WEAPON_ICON_SIZE.h));
+      this.weaponIcon.setAlpha(UI.ALPHA.ICON);
+    }
+
+    if (this.textures.exists('ui_indPanel')) {
+      this.xpPanelSprite = this.add.image(sx(UI.HUD.SURV_PANEL_POS.x), sx(UI.HUD.SURV_PANEL_POS.y), 'ui_indPanel');
+      this.xpPanelSprite.setOrigin(0, 0);
+      this.xpPanelSprite.setScrollFactor(0);
+      this.xpPanelSprite.setDepth(99);
+      this.xpPanelSprite.setAlpha(UI.ALPHA.PANEL);
+    }
+
+    this.levelText = this.add.text(sx(UI.HUD.SURV_LVL_VALUE_POS.x), sx(UI.HUD.SURV_LVL_VALUE_POS.y), '1', {
+      fontSize: `${Math.floor(14 * this.hudScale)}px`,
       color: '#dcdcdc',
       fontFamily: 'Arial Black'
-    }).setOrigin(0, 0).setScrollFactor(0).setDepth(100);
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(100);
 
     this.killText = this.add.text(SCREEN_WIDTH - 16, 16, 'Kills: 0', {
       fontSize: '14px',
@@ -289,42 +411,73 @@ export class GameScene extends Phaser.Scene {
       fontFamily: 'Arial'
     }).setScrollFactor(0).setDepth(100);
 
-    this.powerupIcons = this.add.container(8, 90);
+    this.powerupIcons = this.add.container(8, sx(121));
     this.powerupIcons.setScrollFactor(0);
     this.powerupIcons.setDepth(100);
+
+    if (this.textures.exists('ui_aim')) {
+      this.crosshair = this.add.image(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 'ui_aim');
+      this.crosshair.setScrollFactor(0);
+      this.crosshair.setDepth(200);
+      this.crosshair.setScale(this.hudScale);
+    }
+
+    this.input.setDefaultCursor('none');
   }
 
   private updateHUD() {
+    const sx = (v: number) => v * this.hudScale;
+
     this.healthBar.clear();
-
-    this.healthBar.fillStyle(UI.COLORS.SHADOW, UI.ALPHA.SHADOW);
-    this.healthBar.fillRoundedRect(8 + UI.SHADOW_OFFSET, 8 + UI.SHADOW_OFFSET, 124, 52, 4);
-
-    this.healthBar.fillStyle(0x1a1612, UI.ALPHA.PANEL);
-    this.healthBar.fillRoundedRect(8, 8, 124, 52, 4);
-    this.healthBar.lineStyle(1, 0x3d3830, 0.8);
-    this.healthBar.strokeRoundedRect(8, 8, 124, 52, 4);
-
-    this.healthBar.fillStyle(UI.COLORS.HEALTH_BAR_BG, UI.ALPHA.HEALTH_BG);
-    this.healthBar.fillRect(12, 16, 116, 9);
-    this.healthBar.fillStyle(UI.COLORS.HEALTH_BAR, UI.ALPHA.ICON);
-    const healthWidth = Math.max(0, (this.player.health / this.player.maxHealth) * 116);
-    this.healthBar.fillRect(12, 16, healthWidth, 9);
-
     this.xpBar.clear();
 
-    this.xpBar.fillStyle(UI.COLORS.XP_BAR_BG, 0.6);
-    this.xpBar.fillRect(12, 48, 116, 8);
-    this.xpBar.fillStyle(UI.COLORS.XP_BAR, 1);
+    const healthRatio = Math.max(0, Math.min(1, this.player.health / this.player.maxHealth));
+    if (this.healthBarFill && this.textures.exists('ui_indLife')) {
+      const tex = this.textures.get('ui_indLife');
+      const fullWidth = sx(UI.HUD.HEALTH_BAR_SIZE.w);
+      const fillWidth = fullWidth * healthRatio;
+      this.healthBarFill.setDisplaySize(fillWidth, sx(UI.HUD.HEALTH_BAR_SIZE.h));
+      this.healthBarFill.setCrop(0, 0, tex.getSourceImage().width * healthRatio, tex.getSourceImage().height);
+    }
+
+    if (this.heartSprite) {
+      const t = this.elapsedMs / 1000;
+      const pulseSpeed = this.player.health < 30 ? 5.0 : 2.0;
+      const pulse = (Math.pow(Math.sin(t * pulseSpeed), 4) * 4 + 14);
+      const size = pulse * 2 * this.hudScale;
+      this.heartSprite.setDisplaySize(size, size);
+      this.heartSprite.setPosition(sx(UI.HUD.HEART_CENTER.x), sx(UI.HUD.HEART_CENTER.y));
+    }
+
+    if (this.weaponIcon && this.textures.exists('ui_wicons')) {
+      const weaponIndex = this.player.weaponManager.currentWeaponIndex;
+      const iconIndex = WEAPON_ICON_INDICES[weaponIndex] ?? 0;
+      const tex = this.textures.get('ui_wicons');
+      const texW = tex.getSourceImage().width;
+      const texH = tex.getSourceImage().height;
+      const cellW = texW / 8;
+      const cellH = texH / 8;
+      const frame = iconIndex * 2;
+      const col = frame % 8;
+      const row = Math.floor(frame / 8);
+      this.weaponIcon.setCrop(col * cellW, row * cellH, cellW * 2, cellH);
+    }
+
+    this.updateAmmoIndicators();
+
     const xpNeeded = getXpForLevel(this.player.level);
-    const xpWidth = Math.min(116, (this.player.experience / xpNeeded) * 116);
-    this.xpBar.fillRect(12, 48, xpWidth, 8);
+    const xpRatio = Math.min(1, this.player.experience / xpNeeded);
+    const xpBarX = sx(UI.HUD.SURV_PROGRESS_POS.x);
+    const xpBarY = sx(UI.HUD.SURV_PROGRESS_POS.y);
+    const xpBarWidth = sx(UI.HUD.SURV_PROGRESS_WIDTH);
+    const xpBarH = 4 * this.hudScale;
 
-    this.healthBar.fillStyle(0xcc3333, 0.8);
-    const heartPulse = Math.sin(this.time.now * 0.005) * 2 + 10;
-    this.healthBar.fillCircle(24, 38, heartPulse);
+    this.xpBar.fillStyle(0x0f2952, 0.6);
+    this.xpBar.fillRect(xpBarX, xpBarY, xpBarWidth, xpBarH);
+    this.xpBar.fillStyle(0x1a4d99, 1);
+    this.xpBar.fillRect(xpBarX + this.hudScale, xpBarY + this.hudScale, Math.max(0, (xpBarWidth - 2 * this.hudScale) * xpRatio), xpBarH - 2 * this.hudScale);
 
-    this.levelText.setText(`Lv ${this.player.level}`);
+    this.levelText.setText(`${this.player.level}`);
     this.killText.setText(`Kills: ${this.killCount}`);
 
     const wm = this.player.weaponManager;
@@ -346,7 +499,52 @@ export class GameScene extends Phaser.Scene {
       this.perkPromptText.setVisible(false);
     }
 
+    const pointer = this.input.activePointer;
+    if (this.crosshair) {
+      this.crosshair.setPosition(pointer.x, pointer.y);
+    }
+
     this.updatePowerupIcons();
+  }
+
+  private updateAmmoIndicators() {
+    const sx = (v: number) => v * this.hudScale;
+
+    this.ammoIndicators.forEach(ind => ind.destroy());
+    this.ammoIndicators = [];
+
+    const wm = this.player.weaponManager;
+    const weaponIndex = wm.currentWeaponIndex;
+    const ammoClass = WEAPON_AMMO_CLASS[weaponIndex] ?? 0;
+
+    let texKey = 'ui_indBullet';
+    if (ammoClass === 1) texKey = 'ui_indFire';
+    else if (ammoClass === 2) texKey = 'ui_indRocket';
+    else if (ammoClass === 3) texKey = 'ui_indElectric';
+
+    if (!this.textures.exists(texKey)) return;
+
+    const maxBars = 30;
+    const clampBars = 20;
+    let bars = Math.min(maxBars, wm.clipSize);
+    if (bars > maxBars) bars = clampBars;
+
+    const ammoCount = wm.currentAmmo;
+
+    for (let i = 0; i < bars; i++) {
+      const alpha = i < ammoCount ? UI.ALPHA.ICON : UI.ALPHA.AMMO_DIM;
+      const ind = this.add.image(
+        sx(UI.HUD.AMMO_BASE_POS.x + i * UI.HUD.AMMO_BAR_STEP),
+        sx(UI.HUD.AMMO_BASE_POS.y),
+        texKey
+      );
+      ind.setOrigin(0, 0);
+      ind.setScrollFactor(0);
+      ind.setDepth(101);
+      ind.setDisplaySize(sx(UI.HUD.AMMO_BAR_SIZE.w), sx(UI.HUD.AMMO_BAR_SIZE.h));
+      ind.setAlpha(alpha);
+      this.ammoIndicators.push(ind);
+    }
   }
 
   private updatePowerupIcons() {
@@ -405,6 +603,8 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number) {
     if (this.gameOver) return;
+
+    this.elapsedMs += delta;
 
     if (this.perkSelector.isOpen()) {
       this.perkSelector.update();

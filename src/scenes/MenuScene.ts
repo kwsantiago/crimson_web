@@ -19,7 +19,7 @@ function easeOutCubic(t: number): number {
 }
 
 function widescreenYShift(screenW: number): number {
-  return (screenW / UI.BASE_WIDTH) * 150 - 150;
+  return (screenW / 640.0) * 150.0 - 150.0;
 }
 
 export class MenuScene extends Phaser.Scene {
@@ -42,13 +42,15 @@ export class MenuScene extends Phaser.Scene {
 
   private menuGraphics!: Phaser.GameObjects.Graphics;
   private menuTexts: Phaser.GameObjects.Text[] = [];
+  private menuPanelSprite!: Phaser.GameObjects.Image;
+  private signSprite!: Phaser.GameObjects.Image;
+  private cursorSprite!: Phaser.GameObjects.Image;
 
   constructor() {
     super('MenuScene');
   }
 
-  create() {
-    this.highScoreManager = new HighScoreManager();
+  init() {
     this.menuState = 'main';
     this.selectedMode = GameMode.SURVIVAL;
     this.scoresMode = GameMode.SURVIVAL;
@@ -58,11 +60,37 @@ export class MenuScene extends Phaser.Scene {
     this.selectedIndex = 0;
     this.panelOpenSfxPlayed = false;
     this.widescreenShiftY = widescreenYShift(SCREEN_WIDTH);
+    this.menuEntries = [];
+    this.menuTexts = [];
+  }
+
+  create() {
+    this.highScoreManager = new HighScoreManager();
 
     this.cameras.main.setBackgroundColor(0x1a1208);
 
     this.menuGraphics = this.add.graphics();
     this.menuGraphics.setDepth(10);
+
+    if (this.textures.exists('ui_menuPanel')) {
+      this.menuPanelSprite = this.add.image(0, 0, 'ui_menuPanel');
+      this.menuPanelSprite.setOrigin(0, 0);
+      this.menuPanelSprite.setDepth(5);
+      this.menuPanelSprite.setVisible(false);
+    }
+
+    if (this.textures.exists('ui_signCrimson')) {
+      this.signSprite = this.add.image(0, 0, 'ui_signCrimson');
+      this.signSprite.setOrigin(0, 0);
+      this.signSprite.setDepth(15);
+      this.signSprite.setVisible(false);
+    }
+
+    if (this.textures.exists('ui_cursor')) {
+      this.cursorSprite = this.add.image(0, 0, 'ui_cursor');
+      this.cursorSprite.setOrigin(0, 0);
+      this.cursorSprite.setDepth(100);
+    }
 
     this.createMainMenu();
     this.createModeSelect();
@@ -83,7 +111,14 @@ export class MenuScene extends Phaser.Scene {
       this.drawMainMenu();
     }
 
-    this.drawCursor();
+    this.updateCursor();
+  }
+
+  private updateCursor() {
+    const pointer = this.input.activePointer;
+    if (this.cursorSprite && this.cursorSprite.visible) {
+      this.cursorSprite.setPosition(pointer.x, pointer.y);
+    }
   }
 
   private initMenuEntries() {
@@ -91,10 +126,10 @@ export class MenuScene extends Phaser.Scene {
     const step = UI.MENU.LABEL_STEP;
 
     this.menuEntries = [
-      { slot: 0, label: 'PLAY GAME', action: 'play', y: baseY, hoverAmount: 0, enabled: true },
-      { slot: 1, label: 'OPTIONS', action: 'options', y: baseY + step, hoverAmount: 0, enabled: false },
-      { slot: 2, label: 'HIGH SCORES', action: 'scores', y: baseY + step * 2, hoverAmount: 0, enabled: true },
-      { slot: 3, label: 'QUIT', action: 'quit', y: baseY + step * 3, hoverAmount: 0, enabled: false },
+      { slot: 1, label: 'PLAY GAME', action: 'play', y: baseY + step, hoverAmount: 0, enabled: true },
+      { slot: 2, label: 'OPTIONS', action: 'options', y: baseY + step * 2, hoverAmount: 0, enabled: false },
+      { slot: 3, label: 'HIGH SCORES', action: 'scores', y: baseY + step * 3, hoverAmount: 0, enabled: true },
+      { slot: 4, label: 'QUIT', action: 'quit', y: baseY + step * 4, hoverAmount: 0, enabled: false },
     ];
   }
 
@@ -131,26 +166,14 @@ export class MenuScene extends Phaser.Scene {
 
   private getEntryBounds(entry: MenuEntry): { x: number; y: number; w: number; h: number } {
     const posX = UI.MENU.LABEL_BASE_X - entry.slot * 20;
-    const slideX = this.getSlideX(entry.slot);
-    const x = posX + slideX + 271;
-    const y = entry.y - 37;
-    return { x, y, w: 122, h: 32 };
-  }
+    const posY = entry.y;
 
-  private getSlideX(slot: number): number {
-    const startMs = (slot + 2) * 100 + 300;
-    const endMs = (slot + 2) * 100;
-    const width = 300;
+    const left = posX + 200;
+    const top = posY - 50;
+    const w = 150;
+    const h = 40;
 
-    if (this.timelineMs < endMs) {
-      return -width;
-    } else if (this.timelineMs < startMs) {
-      const elapsed = this.timelineMs - endMs;
-      const span = startMs - endMs;
-      const p = elapsed / span;
-      return -(1 - p) * width;
-    }
-    return 0;
+    return { x: left, y: top, w, h };
   }
 
   private getAngle(slot: number): number {
@@ -197,37 +220,56 @@ export class MenuScene extends Phaser.Scene {
     this.drawMenuPanel();
     this.drawMenuSign();
     this.drawMenuItems();
+
+    if (!this.cursorSprite || !this.textures.exists('ui_cursor')) {
+      this.drawFallbackCursor();
+    }
   }
 
   private drawMenuPanel() {
-    const slideProgress = easeOutCubic(this.timelineMs / this.timelineMaxMs);
-    const panelSlideX = -UI.MENU.PANEL_WIDTH * (1 - slideProgress);
-
-    const panelX = UI.MENU.PANEL_BASE_X + UI.MENU.PANEL_OFFSET_X + panelSlideX;
-    const panelY = UI.MENU.PANEL_BASE_Y + UI.MENU.PANEL_OFFSET_Y + this.widescreenShiftY;
+    const panelBaseX = UI.MENU.PANEL_BASE_X + UI.MENU.PANEL_OFFSET_X;
+    const panelBaseY = UI.MENU.PANEL_BASE_Y + UI.MENU.PANEL_OFFSET_Y + this.widescreenShiftY;
     const panelW = UI.MENU.PANEL_WIDTH;
     const panelH = UI.MENU.PANEL_HEIGHT;
 
-    this.menuGraphics.fillStyle(UI.COLORS.SHADOW, UI.ALPHA.SHADOW);
-    this.menuGraphics.fillRoundedRect(
-      panelX + UI.SHADOW_OFFSET,
-      panelY + UI.SHADOW_OFFSET,
-      panelW,
-      panelH,
-      8
-    );
+    const slideProgress = easeOutCubic(this.timelineMs / this.timelineMaxMs);
+    const slideOffset = -panelW * (1 - slideProgress);
 
-    this.menuGraphics.fillStyle(0x1a1612, UI.ALPHA.PANEL);
-    this.menuGraphics.fillRoundedRect(panelX, panelY, panelW, panelH, 8);
+    const panelX = panelBaseX + slideOffset;
+    const panelY = panelBaseY;
 
-    this.menuGraphics.lineStyle(2, 0x3d3830, 0.8);
-    this.menuGraphics.strokeRoundedRect(panelX, panelY, panelW, panelH, 8);
+    if (this.menuPanelSprite && this.textures.exists('ui_menuPanel')) {
+      this.menuPanelSprite.setVisible(true);
+      this.menuPanelSprite.setPosition(panelX, panelY);
+      this.menuPanelSprite.setDisplaySize(panelW, panelH);
+      this.menuPanelSprite.setAlpha(UI.ALPHA.PANEL);
+    } else {
+      this.menuGraphics.fillStyle(UI.COLORS.SHADOW, UI.ALPHA.SHADOW);
+      this.menuGraphics.fillRoundedRect(
+        panelX + UI.SHADOW_OFFSET,
+        panelY + UI.SHADOW_OFFSET,
+        panelW,
+        panelH,
+        8
+      );
 
-    this.menuGraphics.lineStyle(1, 0x4a4438, 0.5);
-    this.menuGraphics.strokeRoundedRect(panelX + 4, panelY + 4, panelW - 8, panelH - 8, 6);
+      this.menuGraphics.fillStyle(0x1a1612, UI.ALPHA.PANEL);
+      this.menuGraphics.fillRoundedRect(panelX, panelY, panelW, panelH, 8);
+
+      this.menuGraphics.lineStyle(2, 0x3d3830, 0.8);
+      this.menuGraphics.strokeRoundedRect(panelX, panelY, panelW, panelH, 8);
+
+      this.menuGraphics.lineStyle(1, 0x4a4438, 0.5);
+      this.menuGraphics.strokeRoundedRect(panelX + 4, panelY + 4, panelW - 8, panelH - 8, 6);
+    }
   }
 
   private drawMenuSign() {
+    const SIGN_POS_X_PAD = 4;
+    const SIGN_POS_Y = SCREEN_WIDTH > 640 ? 70 : 60;
+    const SIGN_OFFSET_X = -576.44;
+    const SIGN_OFFSET_Y = -61;
+
     const signStartMs = 300;
     const signEndMs = 0;
 
@@ -239,48 +281,72 @@ export class MenuScene extends Phaser.Scene {
       signAngle = -(Math.PI / 2) * (1 - p);
     }
 
-    const signX = SCREEN_WIDTH - 20;
-    const signY = 70;
-    const signW = UI.MENU.SIGN_WIDTH * 0.7;
+    const posX = SCREEN_WIDTH + SIGN_POS_X_PAD;
+    const posY = SIGN_POS_Y;
+    const signW = UI.MENU.SIGN_WIDTH;
+    const signH = UI.MENU.SIGN_HEIGHT;
 
-    const titleText = this.add.text(
-      signX - signW + 80,
-      signY + 10,
-      'CRIMSONLAND',
-      {
-        fontSize: '42px',
-        color: '#cc3333',
-        fontFamily: 'Arial Black',
-        stroke: '#000000',
-        strokeThickness: 4,
-      }
-    ).setOrigin(0, 0).setRotation(signAngle).setDepth(15);
-    this.menuTexts.push(titleText);
+    if (this.signSprite && this.textures.exists('ui_signCrimson')) {
+      this.signSprite.setVisible(true);
+      this.signSprite.setDisplaySize(signW, signH);
+      this.signSprite.setPosition(posX + SIGN_OFFSET_X, posY + SIGN_OFFSET_Y);
+      this.signSprite.setRotation(signAngle);
+      this.signSprite.setOrigin(0, 0);
+    } else {
+      const titleText = this.add.text(
+        posX + SIGN_OFFSET_X + 80,
+        posY + SIGN_OFFSET_Y + 40,
+        'CRIMSONLAND',
+        {
+          fontSize: '42px',
+          color: '#cc3333',
+          fontFamily: 'Arial Black',
+          stroke: '#000000',
+          strokeThickness: 4,
+        }
+      ).setOrigin(0, 0).setRotation(signAngle).setDepth(15);
+      this.menuTexts.push(titleText);
 
-    const subtitleText = this.add.text(
-      signX - signW + 80,
-      signY + 58,
-      'Browser Edition',
-      {
-        fontSize: '16px',
-        color: '#888888',
-        fontFamily: 'Arial',
-      }
-    ).setOrigin(0, 0).setRotation(signAngle).setDepth(15);
-    this.menuTexts.push(subtitleText);
+      const subtitleText = this.add.text(
+        posX + SIGN_OFFSET_X + 80,
+        posY + SIGN_OFFSET_Y + 98,
+        'Browser Edition',
+        {
+          fontSize: '16px',
+          color: '#888888',
+          fontFamily: 'Arial',
+        }
+      ).setOrigin(0, 0).setRotation(signAngle).setDepth(15);
+      this.menuTexts.push(subtitleText);
+    }
   }
 
   private drawMenuItems() {
+    const hasItemTexture = this.textures.exists('ui_menuItem');
+    let itemW = 342, itemH = 64;
+    if (hasItemTexture) {
+      const tex = this.textures.get('ui_menuItem');
+      itemW = tex.getSourceImage().width;
+      itemH = tex.getSourceImage().height;
+    }
+
     for (let i = this.menuEntries.length - 1; i >= 0; i--) {
       const entry = this.menuEntries[i];
       if (!this.isEntryVisible(entry)) continue;
 
       const posX = UI.MENU.LABEL_BASE_X - entry.slot * 20;
-      const slideX = this.getSlideX(entry.slot);
+      const posY = entry.y;
       const angle = this.getAngle(entry.slot);
 
-      const itemX = posX + slideX + 271;
-      const itemY = entry.y - 37;
+      const container = this.add.container(posX, posY);
+      container.setDepth(15);
+      container.setRotation(angle);
+
+      if (hasItemTexture) {
+        const itemSprite = this.add.image(-71, -59, 'ui_menuItem');
+        itemSprite.setOrigin(0, 0);
+        container.add(itemSprite);
+      }
 
       const alpha = entry.enabled
         ? (100 + (entry.hoverAmount * 155) / 1000) / 255
@@ -292,23 +358,23 @@ export class MenuScene extends Phaser.Scene {
       const b = (baseColor & 0xff);
       const colorStr = `rgba(${r}, ${g}, ${b}, ${alpha})`;
 
-      const text = this.add.text(itemX, itemY, entry.label, {
-        fontSize: '20px',
+      const textOffsetX = -71 + itemW / 2 + 150;
+      const textOffsetY = -59 + itemH / 2 + 6;
+
+      const text = this.add.text(textOffsetX, textOffsetY, entry.label, {
+        fontSize: '14px',
         color: colorStr,
         fontFamily: 'Arial Black',
-      }).setOrigin(0, 0.5).setRotation(angle).setDepth(20);
-      this.menuTexts.push(text);
+      });
+      text.setOrigin(0.5, 0.5);
+      text.setDepth(20);
+      container.add(text);
 
-      if (entry.enabled && entry.hoverAmount > 0) {
-        const underlineY = itemY + 12;
-        const underlineWidth = text.width;
-        this.menuGraphics.lineStyle(2, baseColor, alpha);
-        this.menuGraphics.lineBetween(itemX, underlineY, itemX + underlineWidth, underlineY);
-      }
+      this.menuTexts.push(container as any);
     }
   }
 
-  private drawCursor() {
+  private drawFallbackCursor() {
     const pointer = this.input.activePointer;
     const x = pointer.x;
     const y = pointer.y;
@@ -640,6 +706,9 @@ export class MenuScene extends Phaser.Scene {
     this.modeSelectContainer.setVisible(false);
     this.scoresContainer.setVisible(false);
     this.input.setDefaultCursor('none');
+    if (this.menuPanelSprite) this.menuPanelSprite.setVisible(false);
+    if (this.signSprite) this.signSprite.setVisible(false);
+    if (this.cursorSprite) this.cursorSprite.setVisible(true);
   }
 
   private showModeSelect() {
@@ -650,7 +719,10 @@ export class MenuScene extends Phaser.Scene {
     this.mainContainer.setVisible(false);
     this.modeSelectContainer.setVisible(true);
     this.scoresContainer.setVisible(false);
-    this.input.setDefaultCursor('default');
+    this.input.setDefaultCursor('none');
+    if (this.menuPanelSprite) this.menuPanelSprite.setVisible(false);
+    if (this.signSprite) this.signSprite.setVisible(false);
+    if (this.cursorSprite) this.cursorSprite.setVisible(true);
   }
 
   private showScores() {
@@ -662,7 +734,10 @@ export class MenuScene extends Phaser.Scene {
     this.modeSelectContainer.setVisible(false);
     this.scoresContainer.setVisible(true);
     this.rebuildScoresMenu();
-    this.input.setDefaultCursor('default');
+    this.input.setDefaultCursor('none');
+    if (this.menuPanelSprite) this.menuPanelSprite.setVisible(false);
+    if (this.signSprite) this.signSprite.setVisible(false);
+    if (this.cursorSprite) this.cursorSprite.setVisible(true);
   }
 
   private startGame() {
