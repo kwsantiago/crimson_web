@@ -2,8 +2,12 @@ import Phaser from 'phaser';
 import { Player } from '../entities/Player';
 import { Creature } from '../entities/Creature';
 import { Projectile } from '../entities/Projectile';
+import { Bonus } from '../entities/Bonus';
 import { SpawnManager } from '../systems/SpawnManager';
+import { BonusManager } from '../systems/BonusManager';
+import { PerkSelector } from '../ui/PerkSelector';
 import { CreatureType } from '../data/creatures';
+import { PerkId } from '../data/perks';
 import {
   WORLD_WIDTH,
   WORLD_HEIGHT,
@@ -17,7 +21,10 @@ export class GameScene extends Phaser.Scene {
   private creatures!: Phaser.Physics.Arcade.Group;
   private projectiles!: Phaser.Physics.Arcade.Group;
   private enemyProjectiles!: Phaser.Physics.Arcade.Group;
+  private bonuses!: Phaser.Physics.Arcade.Group;
   private spawnManager!: SpawnManager;
+  private bonusManager!: BonusManager;
+  private perkSelector!: PerkSelector;
   private bloodDecals!: Phaser.GameObjects.Group;
   private healthBar!: Phaser.GameObjects.Graphics;
   private xpBar!: Phaser.GameObjects.Graphics;
@@ -27,10 +34,14 @@ export class GameScene extends Phaser.Scene {
   private weaponText!: Phaser.GameObjects.Text;
   private ammoText!: Phaser.GameObjects.Text;
   private reloadText!: Phaser.GameObjects.Text;
+  private perkPromptText!: Phaser.GameObjects.Text;
+  private powerupIcons!: Phaser.GameObjects.Container;
   private gameOver: boolean = false;
   private hitSparkEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private bloodEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private maxBloodDecals: number = 100;
+  private pendingPerks: number = 0;
+  private perkKey!: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super('GameScene');
@@ -39,6 +50,7 @@ export class GameScene extends Phaser.Scene {
   create() {
     this.gameOver = false;
     this.killCount = 0;
+    this.pendingPerks = 0;
 
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
@@ -63,6 +75,11 @@ export class GameScene extends Phaser.Scene {
       runChildUpdate: false
     });
 
+    this.bonuses = this.physics.add.group({
+      classType: Bonus,
+      runChildUpdate: false
+    });
+
     this.player = new Player(
       this,
       WORLD_WIDTH / 2,
@@ -70,10 +87,32 @@ export class GameScene extends Phaser.Scene {
       this.projectiles
     );
 
+    this.player.perkManager.setCallbacks({
+      onXpGain: (amount) => this.player.addXp(amount),
+      onWeaponChange: (index) => this.player.weaponManager.switchWeapon(index),
+      onHeal: (amount) => this.player.heal(amount),
+      onFreezeEnemies: (duration) => this.freezeAllEnemies(duration)
+    });
+
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
     this.spawnManager = new SpawnManager(this, this.creatures, this.enemyProjectiles);
+    this.bonusManager = new BonusManager(this, this.bonuses, this.player);
+    this.bonusManager.setCallbacks({
+      onNuke: () => this.nukeAllEnemies(),
+      onFreeze: (duration) => this.freezeAllEnemies(duration)
+    });
+
+    this.perkSelector = new PerkSelector(this, this.player.perkManager);
+    this.perkSelector.setCallback((perkId) => {
+      this.pendingPerks--;
+      if (this.pendingPerks > 0) {
+        this.time.delayedCall(100, () => this.perkSelector.show());
+      }
+    });
+
+    this.perkKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.P);
 
     this.physics.add.overlap(
       this.projectiles,
@@ -95,6 +134,14 @@ export class GameScene extends Phaser.Scene {
       this.enemyProjectiles,
       this.player,
       this.onEnemyBulletHitPlayer as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback,
+      undefined,
+      this
+    );
+
+    this.physics.add.overlap(
+      this.player,
+      this.bonuses,
+      this.onPlayerPickupBonus as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback,
       undefined,
       this
     );
@@ -179,17 +226,27 @@ export class GameScene extends Phaser.Scene {
       fontFamily: 'Arial Black'
     }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setVisible(false);
 
+    this.perkPromptText = this.add.text(SCREEN_WIDTH / 2, 80, 'Press P to choose a perk!', {
+      fontSize: '18px',
+      color: '#ffd93d',
+      fontFamily: 'Arial Black'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setVisible(false);
+
     this.add.text(16, 16, 'Weapons: 1-5', {
       fontSize: '12px',
       color: '#888888',
       fontFamily: 'Arial'
     }).setScrollFactor(0).setDepth(100);
 
-    this.add.text(16, 32, 'R: Reload', {
+    this.add.text(16, 32, 'R: Reload  P: Perks', {
       fontSize: '12px',
       color: '#888888',
       fontFamily: 'Arial'
     }).setScrollFactor(0).setDepth(100);
+
+    this.powerupIcons = this.add.container(SCREEN_WIDTH - 40, 50);
+    this.powerupIcons.setScrollFactor(0);
+    this.powerupIcons.setDepth(100);
   }
 
   private updateHUD() {
@@ -222,16 +279,75 @@ export class GameScene extends Phaser.Scene {
       this.reloadText.setVisible(false);
       this.ammoText.setColor('#ffffff');
     }
+
+    if (this.pendingPerks > 0 && !this.perkSelector.isOpen()) {
+      this.perkPromptText.setVisible(true);
+      this.perkPromptText.setText(`Press P to choose a perk! (${this.pendingPerks} pending)`);
+    } else {
+      this.perkPromptText.setVisible(false);
+    }
+
+    this.updatePowerupIcons();
+  }
+
+  private updatePowerupIcons() {
+    this.powerupIcons.removeAll(true);
+
+    let y = 0;
+    const spacing = 30;
+
+    if (this.player.hasActiveShield()) {
+      const icon = this.add.sprite(0, y, 'bonus_shield').setScale(0.8);
+      const text = this.add.text(20, y, `${Math.ceil(this.player.shieldTimer)}s`, {
+        fontSize: '12px',
+        color: '#00ffff'
+      }).setOrigin(0, 0.5);
+      this.powerupIcons.add(icon);
+      this.powerupIcons.add(text);
+      y += spacing;
+    }
+
+    if (this.player.hasActiveSpeed()) {
+      const icon = this.add.sprite(0, y, 'bonus_speed').setScale(0.8);
+      const text = this.add.text(20, y, `${Math.ceil(this.player.speedBoostTimer)}s`, {
+        fontSize: '12px',
+        color: '#00ff00'
+      }).setOrigin(0, 0.5);
+      this.powerupIcons.add(icon);
+      this.powerupIcons.add(text);
+      y += spacing;
+    }
+
+    if (this.player.hasActiveReflex()) {
+      const icon = this.add.sprite(0, y, 'bonus_reflex').setScale(0.8);
+      const text = this.add.text(20, y, `${Math.ceil(this.player.reflexBoostTimer)}s`, {
+        fontSize: '12px',
+        color: '#ff00ff'
+      }).setOrigin(0, 0.5);
+      this.powerupIcons.add(icon);
+      this.powerupIcons.add(text);
+    }
   }
 
   update(_time: number, delta: number) {
     if (this.gameOver) return;
+
+    if (this.perkSelector.isOpen()) {
+      this.perkSelector.update();
+      return;
+    }
+
+    if (this.pendingPerks > 0 && Phaser.Input.Keyboard.JustDown(this.perkKey)) {
+      this.perkSelector.show();
+      return;
+    }
 
     const pointer = this.input.activePointer;
     const leveledUp = this.player.update(delta, pointer);
 
     if (leveledUp) {
       this.showLevelUpEffect();
+      this.pendingPerks++;
     }
 
     if (this.player.health <= 0) {
@@ -246,6 +362,7 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
+    this.bonusManager.update(delta);
     this.updateEnemyProjectiles(delta);
     this.spawnManager.update(delta, this.player.level);
     this.updateHUD();
@@ -276,7 +393,8 @@ export class GameScene extends Phaser.Scene {
 
     this.hitSparkEmitter.emitParticleAt(proj.x, proj.y);
 
-    const killed = enemy.takeDamage(proj.damage);
+    const applyPoison = proj.isPoisoned;
+    const killed = enemy.takeDamage(proj.damage, applyPoison);
 
     if (!proj.penetrating) {
       proj.destroy();
@@ -285,13 +403,16 @@ export class GameScene extends Phaser.Scene {
     if (killed) {
       this.player.addXp(enemy.xpValue);
       this.killCount++;
-      this.spawnBloodEffect(enemy.x, enemy.y);
-      this.spawnBloodDecal(enemy.x, enemy.y);
+
+      const bloodyMess = this.player.perkManager.hasBloodyMess();
+      this.spawnBloodEffect(enemy.x, enemy.y, bloodyMess);
+      this.spawnBloodDecal(enemy.x, enemy.y, bloodyMess);
 
       if (enemy.spawnsOnDeath && enemy.spawnCount > 0) {
         this.spawnManager.spawnBabySpiders(enemy.x, enemy.y, enemy.spawnCount);
       }
 
+      this.bonusManager.trySpawnBonus(enemy.x, enemy.y);
       this.spawnXpOrb(enemy.x, enemy.y);
     } else {
       this.bloodEmitter.emitParticleAt(enemy.x, enemy.y, 3);
@@ -336,30 +457,47 @@ export class GameScene extends Phaser.Scene {
     if (body) body.enable = false;
   }
 
-  private spawnBloodEffect(x: number, y: number) {
-    this.bloodEmitter.emitParticleAt(x, y);
+  private onPlayerPickupBonus(
+    player: Phaser.Types.Physics.Arcade.GameObjectWithBody,
+    bonus: Phaser.Types.Physics.Arcade.GameObjectWithBody
+  ) {
+    const b = bonus as Bonus;
+    if (!b.active) return;
+
+    this.bonusManager.collectBonus(b);
   }
 
-  private spawnBloodDecal(x: number, y: number) {
+  private spawnBloodEffect(x: number, y: number, extraBlood: boolean = false) {
+    const quantity = extraBlood ? 16 : 8;
+    this.bloodEmitter.emitParticleAt(x, y, quantity);
+  }
+
+  private spawnBloodDecal(x: number, y: number, extraBlood: boolean = false) {
     while (this.bloodDecals.getLength() >= this.maxBloodDecals) {
       const oldest = this.bloodDecals.getFirst(true) as Phaser.GameObjects.Sprite;
       if (oldest) oldest.destroy();
     }
 
-    const decal = this.add.sprite(x, y, 'blood_decal');
-    decal.setDepth(1);
-    decal.setRotation(Math.random() * Math.PI * 2);
-    decal.setScale(0.5 + Math.random() * 0.5);
-    decal.setAlpha(0.8);
-    this.bloodDecals.add(decal);
+    const decalCount = extraBlood ? 3 : 1;
+    for (let i = 0; i < decalCount; i++) {
+      const offsetX = i === 0 ? 0 : (Math.random() - 0.5) * 30;
+      const offsetY = i === 0 ? 0 : (Math.random() - 0.5) * 30;
 
-    this.tweens.add({
-      targets: decal,
-      alpha: 0,
-      duration: 10000,
-      delay: 5000,
-      onComplete: () => decal.destroy()
-    });
+      const decal = this.add.sprite(x + offsetX, y + offsetY, 'blood_decal');
+      decal.setDepth(1);
+      decal.setRotation(Math.random() * Math.PI * 2);
+      decal.setScale(0.5 + Math.random() * 0.5);
+      decal.setAlpha(0.8);
+      this.bloodDecals.add(decal);
+
+      this.tweens.add({
+        targets: decal,
+        alpha: 0,
+        duration: 10000,
+        delay: 5000,
+        onComplete: () => decal.destroy()
+      });
+    }
   }
 
   private spawnXpOrb(x: number, y: number) {
@@ -400,6 +538,33 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.cameras.main.flash(100, 255, 217, 61, false);
+  }
+
+  private freezeAllEnemies(duration: number) {
+    this.creatures.getChildren().forEach((creature) => {
+      const c = creature as Creature;
+      if (c.active) {
+        c.freeze(duration);
+      }
+    });
+
+    this.cameras.main.flash(200, 100, 200, 255, false);
+  }
+
+  private nukeAllEnemies() {
+    this.cameras.main.shake(300, 0.02);
+    this.cameras.main.flash(300, 255, 255, 200, false);
+
+    this.creatures.getChildren().forEach((creature) => {
+      const c = creature as Creature;
+      if (c.active) {
+        this.player.addXp(c.xpValue);
+        this.killCount++;
+        this.spawnBloodEffect(c.x, c.y, true);
+        this.spawnBloodDecal(c.x, c.y, true);
+        c.takeDamage(9999);
+      }
+    });
   }
 
   private handleGameOver() {

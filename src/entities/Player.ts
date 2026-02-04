@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { WeaponManager } from '../systems/WeaponManager';
+import { PerkManager } from '../systems/PerkManager';
 import {
   PLAYER_BASE_SPEED,
   PLAYER_MAX_HEALTH,
@@ -15,6 +16,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   experience: number;
   level: number;
   weaponManager: WeaponManager;
+  perkManager: PerkManager;
   private muzzleFlash: Phaser.GameObjects.Sprite;
   private muzzleFlashTimer: number = 0;
   private keys: {
@@ -23,6 +25,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     S: Phaser.Input.Keyboard.Key;
     D: Phaser.Input.Keyboard.Key;
   };
+
+  speedBoostTimer: number = 0;
+  shieldTimer: number = 0;
+  reflexBoostTimer: number = 0;
+  private regenTimer: number = 0;
+  private passiveXpTimer: number = 0;
+  private shieldSprite?: Phaser.GameObjects.Arc;
 
   constructor(scene: Phaser.Scene, x: number, y: number, projectiles: Phaser.Physics.Arcade.Group) {
     super(scene, x, y, 'player');
@@ -37,7 +46,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.maxHealth = PLAYER_MAX_HEALTH;
     this.experience = 0;
     this.level = 1;
-    this.weaponManager = new WeaponManager(scene, projectiles);
+
+    this.perkManager = new PerkManager();
+    this.weaponManager = new WeaponManager(scene, projectiles, this.perkManager);
+
+    this.perkManager.setCallbacks({
+      onXpGain: (amount) => this.addXp(amount),
+      onWeaponChange: (index) => this.weaponManager.switchWeapon(index),
+      onHeal: (amount) => this.heal(amount)
+    });
 
     this.muzzleFlash = scene.add.sprite(x, y, 'muzzle_flash');
     this.muzzleFlash.setVisible(false);
@@ -57,13 +74,46 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       return false;
     }
 
+    const dt = delta / 1000;
+
+    this.updateTimers(dt);
     this.weaponManager.update(delta);
     this.handleMovement();
     this.handleAiming(pointer);
     this.handleShooting(pointer);
     this.updateMuzzleFlash(delta);
+    this.updateShieldVisual();
+
+    if (this.perkManager.hasRegeneration()) {
+      this.regenTimer += dt;
+      if (this.regenTimer >= 1.0) {
+        this.regenTimer = 0;
+        this.heal(1);
+      }
+    }
+
+    const passiveXp = this.perkManager.getPassiveXpPerSecond();
+    if (passiveXp > 0) {
+      this.passiveXpTimer += dt;
+      if (this.passiveXpTimer >= 1.0) {
+        this.passiveXpTimer = 0;
+        this.addXp(passiveXp);
+      }
+    }
 
     return this.checkLevelUp();
+  }
+
+  private updateTimers(dt: number) {
+    if (this.speedBoostTimer > 0) {
+      this.speedBoostTimer -= dt;
+    }
+    if (this.shieldTimer > 0) {
+      this.shieldTimer -= dt;
+    }
+    if (this.reflexBoostTimer > 0) {
+      this.reflexBoostTimer -= dt;
+    }
   }
 
   private handleMovement() {
@@ -80,7 +130,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       vy *= 0.7071;
     }
 
-    this.setVelocity(vx * PLAYER_BASE_SPEED, vy * PLAYER_BASE_SPEED);
+    let speed = PLAYER_BASE_SPEED;
+    speed *= this.perkManager.getSpeedMultiplier();
+
+    if (this.speedBoostTimer > 0) {
+      speed *= 2.0;
+    }
+
+    this.setVelocity(vx * speed, vy * speed);
   }
 
   private handleAiming(pointer: Phaser.Input.Pointer) {
@@ -115,6 +172,20 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
+  private updateShieldVisual() {
+    if (this.shieldTimer > 0) {
+      if (!this.shieldSprite) {
+        this.shieldSprite = this.scene.add.circle(this.x, this.y, 24, 0x00ffff, 0.3);
+        this.shieldSprite.setStrokeStyle(2, 0x00ffff);
+        this.shieldSprite.setDepth(9);
+      }
+      this.shieldSprite.setPosition(this.x, this.y);
+      this.shieldSprite.setVisible(true);
+    } else if (this.shieldSprite) {
+      this.shieldSprite.setVisible(false);
+    }
+  }
+
   private checkLevelUp(): boolean {
     const xpNeeded = getXpForLevel(this.level);
     if (this.experience >= xpNeeded) {
@@ -126,7 +197,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   takeDamage(amount: number) {
-    this.health -= amount;
+    if (this.shieldTimer > 0) {
+      return;
+    }
+
+    let damage = amount * this.perkManager.getDamageReduction();
+    this.health -= damage;
+
     if (this.health <= 0) {
       this.health = 0;
       this.setActive(false);
@@ -134,7 +211,35 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
+  heal(amount: number) {
+    this.health = Math.min(this.maxHealth, this.health + amount);
+  }
+
   addXp(amount: number) {
     this.experience += amount;
+  }
+
+  activateSpeedBoost(duration: number) {
+    this.speedBoostTimer = duration;
+  }
+
+  activateShield(duration: number) {
+    this.shieldTimer = duration;
+  }
+
+  activateReflexBoost(duration: number) {
+    this.reflexBoostTimer = duration;
+  }
+
+  hasActiveShield(): boolean {
+    return this.shieldTimer > 0;
+  }
+
+  hasActiveSpeed(): boolean {
+    return this.speedBoostTimer > 0;
+  }
+
+  hasActiveReflex(): boolean {
+    return this.reflexBoostTimer > 0;
   }
 }

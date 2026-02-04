@@ -12,11 +12,14 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
   isRanged: boolean;
   spawnsOnDeath?: CreatureType;
   spawnCount: number;
+  freezeTimer: number = 0;
+  poisonTimer: number = 0;
   private attackCooldown: number = 0;
   private attackRate: number = 1.0;
   private projectileCooldown: number = 0;
   private projectileRate: number = 2.0;
   private projectiles?: Phaser.Physics.Arcade.Group;
+  private poisonDamageTimer: number = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -58,6 +61,34 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
 
     const dt = delta / 1000;
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
+
+    if (this.freezeTimer > 0) {
+      this.freezeTimer -= dt;
+      this.setVelocity(0, 0);
+      this.setTint(0x88ccff);
+      return;
+    } else {
+      this.clearTint();
+    }
+
+    if (this.poisonTimer > 0) {
+      this.poisonTimer -= dt;
+      this.poisonDamageTimer += dt;
+
+      if (this.poisonDamageTimer >= 0.5) {
+        this.poisonDamageTimer = 0;
+        this.health -= 3;
+        this.setTint(0x00ff00);
+        this.scene.time.delayedCall(100, () => {
+          if (this.active && this.freezeTimer <= 0) this.clearTint();
+        });
+
+        if (this.health <= 0) {
+          this.die();
+          return;
+        }
+      }
+    }
 
     const dx = player.x - this.x;
     const dy = player.y - this.y;
@@ -129,18 +160,28 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
-  takeDamage(amount: number): boolean {
+  takeDamage(amount: number, applyPoison: boolean = false): boolean {
     this.health -= amount;
     this.setTint(0xffffff);
     this.scene.time.delayedCall(50, () => {
-      if (this.active) this.clearTint();
+      if (this.active && this.freezeTimer <= 0) this.clearTint();
     });
+
+    if (applyPoison && this.poisonTimer <= 0) {
+      this.poisonTimer = 3.0;
+      this.poisonDamageTimer = 0;
+    }
 
     if (this.health <= 0) {
       this.die();
       return true;
     }
     return false;
+  }
+
+  freeze(duration: number) {
+    this.freezeTimer = duration;
+    this.setVelocity(0, 0);
   }
 
   private die() {

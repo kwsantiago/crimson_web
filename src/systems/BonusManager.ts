@@ -1,0 +1,111 @@
+import Phaser from 'phaser';
+import { Bonus } from '../entities/Bonus';
+import { BonusType, getBonusData, pickRandomBonusType } from '../data/bonuses';
+import { Player } from '../entities/Player';
+import { WEAPONS } from '../data/weapons';
+
+export class BonusManager {
+  private scene: Phaser.Scene;
+  private bonuses: Phaser.Physics.Arcade.Group;
+  private player: Player;
+  private baseSpawnChance: number = 0.10;
+
+  private onNuke?: () => void;
+  private onFreeze?: (duration: number) => void;
+
+  constructor(
+    scene: Phaser.Scene,
+    bonuses: Phaser.Physics.Arcade.Group,
+    player: Player
+  ) {
+    this.scene = scene;
+    this.bonuses = bonuses;
+    this.player = player;
+  }
+
+  setCallbacks(callbacks: {
+    onNuke?: () => void;
+    onFreeze?: (duration: number) => void;
+  }) {
+    this.onNuke = callbacks.onNuke;
+    this.onFreeze = callbacks.onFreeze;
+  }
+
+  trySpawnBonus(x: number, y: number) {
+    let chance = this.baseSpawnChance;
+
+    if (Math.random() > chance) return;
+
+    const type = pickRandomBonusType();
+    this.spawnBonus(x, y, type);
+  }
+
+  spawnBonus(x: number, y: number, type: BonusType) {
+    const bonus = new Bonus(this.scene, x, y, type);
+    this.bonuses.add(bonus);
+  }
+
+  update(delta: number) {
+    const hasMagnet = this.player.perkManager.hasBonusMagnet();
+
+    this.bonuses.getChildren().forEach((obj) => {
+      const bonus = obj as Bonus;
+      if (bonus.active) {
+        bonus.update(delta, this.player.x, this.player.y, hasMagnet);
+      }
+    });
+  }
+
+  collectBonus(bonus: Bonus) {
+    if (!bonus.active) return;
+
+    const data = getBonusData(bonus.bonusType);
+
+    switch (bonus.bonusType) {
+      case BonusType.XP_SMALL:
+      case BonusType.XP_MEDIUM:
+      case BonusType.XP_LARGE:
+        if (data.xpValue) {
+          this.player.addXp(data.xpValue);
+        }
+        break;
+
+      case BonusType.MEDIKIT:
+        if (data.healAmount) {
+          this.player.heal(data.healAmount);
+        }
+        break;
+
+      case BonusType.WEAPON:
+        const currentIndex = this.player.weaponManager.currentWeaponIndex;
+        let newIndex: number;
+        do {
+          newIndex = Math.floor(Math.random() * WEAPONS.length);
+        } while (newIndex === currentIndex && WEAPONS.length > 1);
+        this.player.weaponManager.switchWeapon(newIndex);
+        break;
+
+      case BonusType.SPEED:
+        this.player.activateSpeedBoost(data.duration);
+        break;
+
+      case BonusType.SHIELD:
+        this.player.activateShield(data.duration);
+        break;
+
+      case BonusType.FREEZE:
+        this.onFreeze?.(data.duration);
+        break;
+
+      case BonusType.REFLEX_BOOST:
+        this.player.activateReflexBoost(data.duration);
+        break;
+
+      case BonusType.NUKE:
+        this.onNuke?.();
+        break;
+    }
+
+    bonus.destroy();
+  }
+}

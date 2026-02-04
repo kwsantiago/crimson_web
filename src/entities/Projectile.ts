@@ -6,6 +6,7 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
   damage: number = 0;
   projectileType: ProjectileType = ProjectileType.BULLET;
   penetrating: boolean = false;
+  isPoisoned: boolean = false;
   private lifespan: number = 0;
   private maxLifespan: number = 2000;
 
@@ -23,6 +24,7 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
   ) {
     this.projectileType = type;
     this.penetrating = type === ProjectileType.FLAME;
+    this.isPoisoned = false;
 
     const textureKey = this.getTextureForType(type);
     this.setTexture(textureKey);
