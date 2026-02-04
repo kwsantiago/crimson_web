@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { PaqArchive, decodeJaz, jazToCanvas, isJazFile } from '../loaders/PaqLoader';
 
-const PAQ_URL = 'https://paq.crimson.banteg.xyz/v1.9.93/crimson.paq';
+const PAQ_BASE = 'https://paq.crimson.banteg.xyz/v1.9.93/crimson.paq';
+const PAQ_URL = `https://corsproxy.io/?${encodeURIComponent(PAQ_BASE)}`;
 
 export class BootScene extends Phaser.Scene {
   private loadingText!: Phaser.GameObjects.Text;
