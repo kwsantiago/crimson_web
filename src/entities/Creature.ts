@@ -1,35 +1,63 @@
 import Phaser from 'phaser';
 import { Player } from './Player';
-import { ZOMBIE_SPEED, ZOMBIE_HEALTH, ZOMBIE_DAMAGE, ZOMBIE_XP, ZOMBIE_RADIUS } from '../config';
+import { CreatureType, CreatureData, getCreatureData, CREATURES } from '../data/creatures';
 
 export class Creature extends Phaser.Physics.Arcade.Sprite {
+  creatureType: CreatureType;
   health: number;
   maxHealth: number;
   speed: number;
   damage: number;
   xpValue: number;
+  isRanged: boolean;
+  spawnsOnDeath?: CreatureType;
+  spawnCount: number;
   private attackCooldown: number = 0;
   private attackRate: number = 1.0;
+  private projectileCooldown: number = 0;
+  private projectileRate: number = 2.0;
+  private projectiles?: Phaser.Physics.Arcade.Group;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, texture: string = 'zombie') {
-    super(scene, x, y, texture);
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    type: CreatureType = CreatureType.ZOMBIE,
+    projectiles?: Phaser.Physics.Arcade.Group
+  ) {
+    const data = getCreatureData(type);
+    super(scene, x, y, type);
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
-    this.setCircle(ZOMBIE_RADIUS, 14 - ZOMBIE_RADIUS, 14 - ZOMBIE_RADIUS);
+    this.creatureType = type;
+    this.projectiles = projectiles;
 
-    this.health = ZOMBIE_HEALTH;
-    this.maxHealth = ZOMBIE_HEALTH;
-    this.speed = ZOMBIE_SPEED;
-    this.damage = ZOMBIE_DAMAGE;
-    this.xpValue = ZOMBIE_XP;
+    const offsetX = (14 - data.radius);
+    const offsetY = (14 - data.radius);
+    this.setCircle(data.radius, offsetX > 0 ? offsetX : 0, offsetY > 0 ? offsetY : 0);
+    this.setScale(data.scale);
+
+    this.health = data.health;
+    this.maxHealth = data.health;
+    this.speed = data.speed;
+    this.damage = data.damage;
+    this.xpValue = data.xp;
+    this.isRanged = data.isRanged;
+    this.spawnsOnDeath = data.spawnsOnDeath;
+    this.spawnCount = data.spawnCount || 0;
+
+    if (data.projectileCooldown) {
+      this.projectileRate = data.projectileCooldown;
+    }
   }
 
   update(delta: number, player: Player) {
     if (this.health <= 0 || !this.active) return;
 
-    this.attackCooldown = Math.max(0, this.attackCooldown - delta / 1000);
+    const dt = delta / 1000;
+    this.attackCooldown = Math.max(0, this.attackCooldown - dt);
 
     const dx = player.x - this.x;
     const dy = player.y - this.y;
@@ -38,10 +66,55 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     if (dist > 0) {
       const heading = Math.atan2(dy, dx);
       this.setRotation(heading);
-      this.setVelocity(
-        (dx / dist) * this.speed,
-        (dy / dist) * this.speed
-      );
+
+      if (this.isRanged) {
+        this.projectileCooldown -= dt;
+        if (dist > 150) {
+          this.setVelocity(
+            (dx / dist) * this.speed,
+            (dy / dist) * this.speed
+          );
+        } else if (dist < 100) {
+          this.setVelocity(
+            -(dx / dist) * this.speed * 0.5,
+            -(dy / dist) * this.speed * 0.5
+          );
+        } else {
+          this.setVelocity(0, 0);
+        }
+
+        if (this.projectileCooldown <= 0 && this.projectiles) {
+          this.fireProjectile(player);
+          this.projectileCooldown = this.projectileRate;
+        }
+      } else {
+        this.setVelocity(
+          (dx / dist) * this.speed,
+          (dy / dist) * this.speed
+        );
+      }
+    }
+  }
+
+  private fireProjectile(player: Player) {
+    if (!this.projectiles) return;
+
+    const angle = Math.atan2(player.y - this.y, player.x - this.x);
+    const bullet = this.projectiles.get(this.x, this.y, 'alien_projectile');
+    if (bullet) {
+      bullet.setActive(true);
+      bullet.setVisible(true);
+      bullet.setRotation(angle);
+      bullet.damage = 8;
+      bullet.isEnemyProjectile = true;
+      const body = bullet.body as Phaser.Physics.Arcade.Body;
+      if (body) {
+        body.enable = true;
+        body.setVelocity(
+          Math.cos(angle) * 200,
+          Math.sin(angle) * 200
+        );
+      }
     }
   }
 
@@ -50,7 +123,7 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
   }
 
   attack(player: Player) {
-    if (this.canAttack()) {
+    if (this.canAttack() && this.damage > 0) {
       player.takeDamage(this.damage);
       this.attackCooldown = this.attackRate;
     }

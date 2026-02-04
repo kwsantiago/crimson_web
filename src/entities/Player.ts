@@ -1,12 +1,9 @@
 import Phaser from 'phaser';
-import { Projectile } from './Projectile';
+import { WeaponManager } from '../systems/WeaponManager';
 import {
   PLAYER_BASE_SPEED,
   PLAYER_MAX_HEALTH,
   PLAYER_RADIUS,
-  BULLET_SPEED,
-  BULLET_DAMAGE,
-  FIRE_RATE,
   WORLD_WIDTH,
   WORLD_HEIGHT,
   getXpForLevel
@@ -17,8 +14,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   maxHealth: number;
   experience: number;
   level: number;
-  shotCooldown: number;
-  private projectiles: Phaser.Physics.Arcade.Group;
+  weaponManager: WeaponManager;
+  private muzzleFlash: Phaser.GameObjects.Sprite;
+  private muzzleFlashTimer: number = 0;
   private keys: {
     W: Phaser.Input.Keyboard.Key;
     A: Phaser.Input.Keyboard.Key;
@@ -39,8 +37,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.maxHealth = PLAYER_MAX_HEALTH;
     this.experience = 0;
     this.level = 1;
-    this.shotCooldown = 0;
-    this.projectiles = projectiles;
+    this.weaponManager = new WeaponManager(scene, projectiles);
+
+    this.muzzleFlash = scene.add.sprite(x, y, 'muzzle_flash');
+    this.muzzleFlash.setVisible(false);
+    this.muzzleFlash.setDepth(10);
 
     const keyboard = scene.input.keyboard!;
     this.keys = {
@@ -56,9 +57,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       return false;
     }
 
+    this.weaponManager.update(delta);
     this.handleMovement();
     this.handleAiming(pointer);
-    this.handleShooting(delta, pointer);
+    this.handleShooting(pointer);
+    this.updateMuzzleFlash(delta);
 
     return this.checkLevelUp();
   }
@@ -86,19 +89,29 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.setRotation(angle);
   }
 
-  private handleShooting(delta: number, pointer: Phaser.Input.Pointer) {
-    this.shotCooldown = Math.max(0, this.shotCooldown - delta / 1000);
-
-    if (pointer.isDown && this.shotCooldown <= 0) {
-      this.fire();
-      this.shotCooldown = FIRE_RATE;
+  private handleShooting(pointer: Phaser.Input.Pointer) {
+    if (pointer.isDown) {
+      this.weaponManager.fire(this.x, this.y, this.rotation, () => this.showMuzzleFlash());
     }
   }
 
-  private fire() {
-    const bullet = this.projectiles.get(this.x, this.y, 'bullet') as Projectile;
-    if (bullet) {
-      bullet.fire(this.x, this.y, this.rotation, BULLET_SPEED, BULLET_DAMAGE);
+  private showMuzzleFlash() {
+    this.muzzleFlashTimer = 50;
+    this.muzzleFlash.setVisible(true);
+  }
+
+  private updateMuzzleFlash(delta: number) {
+    if (this.muzzleFlashTimer > 0) {
+      this.muzzleFlashTimer -= delta;
+      const offset = 20;
+      this.muzzleFlash.setPosition(
+        this.x + Math.cos(this.rotation) * offset,
+        this.y + Math.sin(this.rotation) * offset
+      );
+      this.muzzleFlash.setRotation(this.rotation);
+      if (this.muzzleFlashTimer <= 0) {
+        this.muzzleFlash.setVisible(false);
+      }
     }
   }
 
