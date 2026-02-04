@@ -33,10 +33,6 @@ export interface CreatureData {
   spawnType?: CreatureType;
 }
 
-// Original game sizes from decompiled code (in game units):
-// zombie: 64, big zombie: 80, spider: 50/40, alien: 55/65, lizard: 32
-// Scale = size/64 to match original game rendering
-
 export const CREATURES: Record<CreatureType, CreatureData> = {
   [CreatureType.ZOMBIE]: {
     type: CreatureType.ZOMBIE,
@@ -46,7 +42,7 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 10,
     xp: 10,
     radius: 14,
-    scale: 1.0,  // size 64
+    scale: 1.0,
     tint: 0xffffff,
     isRanged: false
   },
@@ -58,7 +54,7 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 8,
     xp: 15,
     radius: 12,
-    scale: 0.85,  // slightly smaller
+    scale: 0.85,
     tint: 0xffffff,
     isRanged: false
   },
@@ -70,7 +66,7 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 20,
     xp: 35,
     radius: 18,
-    scale: 1.25,  // size 80
+    scale: 1.25,
     tint: 0xffffff,
     isRanged: false
   },
@@ -82,7 +78,7 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 5,
     xp: 8,
     radius: 8,
-    scale: 0.78,  // size 50
+    scale: 0.78,
     tint: 0xffffff,
     isRanged: false
   },
@@ -94,7 +90,7 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 2,
     xp: 3,
     radius: 5,
-    scale: 0.625,  // size 40 -> 40/64
+    scale: 0.625,
     tint: 0xffffff,
     isRanged: false
   },
@@ -106,7 +102,7 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 15,
     xp: 50,
     radius: 20,
-    scale: 1.0,  // size 64
+    scale: 1.0,
     tint: 0xffffff,
     isRanged: false,
     spawnsOnDeath: CreatureType.BABY_SPIDER,
@@ -120,7 +116,7 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 0,
     xp: 25,
     radius: 14,
-    scale: 0.86,  // size 55
+    scale: 0.86,
     tint: 0xffffff,
     isRanged: true,
     projectileCooldown: 2.0
@@ -133,7 +129,7 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 0,
     xp: 50,
     radius: 16,
-    scale: 1.016,  // size 65 -> 65/64
+    scale: 1.016,
     tint: 0xffffff,
     isRanged: true,
     projectileCooldown: 1.2
@@ -146,7 +142,7 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 20,
     xp: 200,
     radius: 28,
-    scale: 1.5,  // larger boss
+    scale: 1.5,
     tint: 0xffffff,
     isRanged: true,
     projectileCooldown: 0.8
@@ -159,7 +155,7 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 12,
     xp: 20,
     radius: 12,
-    scale: 0.5,  // size 32
+    scale: 0.5,
     tint: 0xffffff,
     isRanged: false
   },
@@ -171,7 +167,7 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 0,
     xp: 30,
     radius: 12,
-    scale: 0.5,  // size 32
+    scale: 0.5,
     tint: 0xffffff,
     isRanged: true,
     projectileCooldown: 1.5
@@ -184,7 +180,7 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 0,
     xp: 100,
     radius: 24,
-    scale: 0.78,  // size 50
+    scale: 0.78,
     tint: 0xffffff,
     isRanged: false,
     isStationary: true,
@@ -199,7 +195,7 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 30,
     xp: 500,
     radius: 32,
-    scale: 1.5,  // big boss
+    scale: 1.5,
     tint: 0xffffff,
     isRanged: true,
     projectileCooldown: 0.5

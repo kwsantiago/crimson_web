@@ -35,48 +35,42 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private movePhase: number = 0;
   private isMoving: boolean = false;
 
-  // Two-layer sprite system like original game
   private legSprite: Phaser.GameObjects.Sprite;
   private torsoSprite: Phaser.GameObjects.Sprite;
   private legShadow: Phaser.GameObjects.Sprite;
   private torsoShadow: Phaser.GameObjects.Sprite;
 
-  private readonly PLAYER_SCALE = 50.0 / 64.0;  // Original: 50 world units, 64px cell
+  private readonly PLAYER_SCALE = 50.0 / 64.0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, projectiles: Phaser.Physics.Arcade.Group) {
-    // Base sprite for physics only (invisible)
     super(scene, x, y, 'trooper_sheet', 0);
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
-    // Physics body setup
     this.setScale(this.PLAYER_SCALE);
     const scaledCenter = 32 * this.PLAYER_SCALE;
     this.setCircle(PLAYER_RADIUS, scaledCenter - PLAYER_RADIUS, scaledCenter - PLAYER_RADIUS);
     this.setCollideWorldBounds(true);
-    this.setVisible(false);  // Hide base sprite, we draw legs+torso separately
+    this.setVisible(false);
 
-    // Create shadow sprites (drawn first, behind player)
     this.legShadow = scene.add.sprite(x, y, 'trooper_sheet', 0);
-    this.legShadow.setScale(this.PLAYER_SCALE * 1.02);  // Shadow 1.02x
+    this.legShadow.setScale(this.PLAYER_SCALE * 1.02);
     this.legShadow.setTint(0x000000);
-    this.legShadow.setAlpha(0.35);  // ~90/255
+    this.legShadow.setAlpha(0.35);
     this.legShadow.setDepth(4);
 
     this.torsoShadow = scene.add.sprite(x, y, 'trooper_sheet', 16);
-    this.torsoShadow.setScale(this.PLAYER_SCALE * 1.03);  // Shadow 1.03x
+    this.torsoShadow.setScale(this.PLAYER_SCALE * 1.03);
     this.torsoShadow.setTint(0x000000);
     this.torsoShadow.setAlpha(0.35);
     this.torsoShadow.setDepth(4);
 
-    // Create leg sprite (frames 0-15)
     this.legSprite = scene.add.sprite(x, y, 'trooper_sheet', 0);
     this.legSprite.setScale(this.PLAYER_SCALE);
-    this.legSprite.setTint(0xf0f0ff);  // Original: RGB(240, 240, 255)
+    this.legSprite.setTint(0xf0f0ff);
     this.legSprite.setDepth(5);
 
-    // Create torso sprite (frames 16-31)
     this.torsoSprite = scene.add.sprite(x, y, 'trooper_sheet', 16);
     this.torsoSprite.setScale(this.PLAYER_SCALE);
     this.torsoSprite.setTint(0xf0f0ff);
@@ -96,9 +90,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       onHeal: (amount) => this.heal(amount)
     });
 
-    this.muzzleFlash = scene.add.sprite(x, y, 'muzzle_flash');
+    this.muzzleFlash = scene.add.sprite(x, y, 'muzzle_flash_img');
     this.muzzleFlash.setVisible(false);
     this.muzzleFlash.setDepth(10);
+    this.muzzleFlash.setBlendMode(Phaser.BlendModes.ADD);
 
     const keyboard = scene.input.keyboard!;
     this.keys = {
@@ -156,9 +151,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.reflexBoostTimer > 0) {
       this.reflexBoostTimer -= dt;
     }
-    // Decay muzzle flash
     if (this.muzzleFlashAlpha > 0) {
-      this.muzzleFlashAlpha -= dt * 10;
+      this.muzzleFlashAlpha -= dt * 2.0;
       if (this.muzzleFlashAlpha < 0) this.muzzleFlashAlpha = 0;
     }
   }
@@ -181,8 +175,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     if (this.isMoving) {
       this.moveAngle = Math.atan2(vy, vx);
-      // Animate walk cycle (0-14 frames)
-      this.movePhase += dt * 12;  // Animation speed
+      this.movePhase += dt * 12;
       if (this.movePhase >= 15) this.movePhase -= 15;
     }
 
@@ -202,32 +195,26 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   private updateSprites() {
-    // Calculate leg and torso frames
     const legFrame = Math.max(0, Math.min(14, Math.floor(this.movePhase)));
     const torsoFrame = legFrame + 16;
 
-    // Sprites face UP at rotation 0, so add PI/2 to convert from heading (0=right) to sprite rotation
     const SPRITE_OFFSET = Math.PI / 2;
     const legRotation = (this.isMoving ? this.moveAngle : this.aimAngle) + SPRITE_OFFSET;
     const torsoRotation = this.aimAngle + SPRITE_OFFSET;
 
-    // Update leg sprite
     this.legSprite.setFrame(legFrame);
     this.legSprite.setPosition(this.x, this.y);
     this.legSprite.setRotation(legRotation);
 
-    // Calculate recoil offset for torso (perpendicular to aim)
     const recoilDir = this.aimAngle + Math.PI / 2;
-    const recoilAmount = this.muzzleFlashAlpha * 3;
+    const recoilAmount = this.muzzleFlashAlpha * 12.0 * this.PLAYER_SCALE;
     const recoilX = Math.cos(recoilDir) * recoilAmount;
     const recoilY = Math.sin(recoilDir) * recoilAmount;
 
-    // Update torso sprite
     this.torsoSprite.setFrame(torsoFrame);
     this.torsoSprite.setPosition(this.x + recoilX, this.y + recoilY);
     this.torsoSprite.setRotation(torsoRotation);
 
-    // Update shadows with offset
     const baseSize = 50.0 * this.PLAYER_SCALE;
     const legShadowOff = 3.0 + baseSize * 0.01;
     const torsoShadowOff = 1.0 + baseSize * 0.015;
@@ -248,20 +235,24 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   private showMuzzleFlash() {
-    this.muzzleFlashAlpha = 1.0;
+    this.muzzleFlashAlpha = Math.min(0.8, this.muzzleFlashAlpha + 0.4);
     this.muzzleFlash.setVisible(true);
   }
 
   private updateMuzzleFlash(dt: number) {
     if (this.muzzleFlashAlpha > 0) {
-      const offset = 20;
+      const muzzleDistance = 20;
       this.muzzleFlash.setPosition(
-        this.x + Math.cos(this.aimAngle) * offset,
-        this.y + Math.sin(this.aimAngle) * offset
+        this.x + Math.cos(this.aimAngle) * muzzleDistance,
+        this.y + Math.sin(this.aimAngle) * muzzleDistance
       );
       this.muzzleFlash.setRotation(this.aimAngle);
-      this.muzzleFlash.setAlpha(this.muzzleFlashAlpha * 0.8);
-      if (this.muzzleFlashAlpha <= 0.1) {
+
+      const flashAlpha = Math.min(1.0, Math.max(0.0, this.muzzleFlashAlpha));
+      this.muzzleFlash.setAlpha(flashAlpha);
+      this.muzzleFlash.setScale(0.5);
+
+      if (this.muzzleFlashAlpha <= 0.001) {
         this.muzzleFlash.setVisible(false);
       }
     }

@@ -6,8 +6,6 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload() {
-    // Load real sprite atlases from extracted assets
-    // Creature spritesheets: 512x512, 8x8 grid = 64x64 per frame
     this.load.spritesheet('trooper_sheet', '/assets/game/trooper.png', { frameWidth: 64, frameHeight: 64 });
     this.load.spritesheet('zombie_sheet', '/assets/game/zombie.png', { frameWidth: 64, frameHeight: 64 });
     this.load.spritesheet('alien_sheet', '/assets/game/alien.png', { frameWidth: 64, frameHeight: 64 });
@@ -15,42 +13,25 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet('spider_sp1_sheet', '/assets/game/spider_sp1.png', { frameWidth: 64, frameHeight: 64 });
     this.load.spritesheet('spider_sp2_sheet', '/assets/game/spider_sp2.png', { frameWidth: 64, frameHeight: 64 });
 
-    // Projectiles: 128x128, 8x8 grid = 16x16 per frame
     this.load.spritesheet('projs_sheet', '/assets/game/projs.png', { frameWidth: 16, frameHeight: 16 });
-
-    // Bonuses: 128x128, 4x4 grid = 32x32 per frame
     this.load.spritesheet('bonuses_sheet', '/assets/game/bonuses.png', { frameWidth: 32, frameHeight: 32 });
-
-    // Particles: 256x256, 8x8 grid = 32x32 per frame
     this.load.spritesheet('particles_sheet', '/assets/game/particles.png', { frameWidth: 32, frameHeight: 32 });
-
-    // Corpses: 256x256, 4x4 grid = 64x64 per frame
     this.load.spritesheet('bodyset_sheet', '/assets/game/bodyset.png', { frameWidth: 64, frameHeight: 64 });
-
-    // Muzzle flash: 64x64, 4x4 grid = 16x16 per frame
-    this.load.spritesheet('muzzle_sheet', '/assets/game/muzzleFlash.png', { frameWidth: 16, frameHeight: 16 });
-
-    // Arrow cursor
+    this.load.image('muzzle_flash_img', '/assets/game/muzzleFlash.png');
     this.load.image('arrow', '/assets/game/arrow.png');
-
-    // Terrain textures (use quest 1 terrain as default)
     this.load.image('terrain', '/assets/game/crimson/ter/ter_q1_base.png');
 
-    // Load error handler
     this.load.on('loaderror', (file: Phaser.Loader.File) => {
       console.warn(`Failed to load: ${file.key} from ${file.url}`);
     });
   }
 
   create() {
-    // Create simple texture aliases using frame references
-    // Player - use trooper_sheet frame 0
     this.textures.addSpriteSheet('player', this.textures.get('trooper_sheet').getSourceImage() as HTMLImageElement, {
       frameWidth: 64,
       frameHeight: 64
     });
 
-    // Zombie variants - all from zombie_sheet
     this.textures.addSpriteSheet('zombie', this.textures.get('zombie_sheet').getSourceImage() as HTMLImageElement, {
       frameWidth: 64,
       frameHeight: 64
@@ -64,7 +45,6 @@ export class BootScene extends Phaser.Scene {
       frameHeight: 64
     });
 
-    // Spiders
     this.textures.addSpriteSheet('spider', this.textures.get('spider_sp1_sheet').getSourceImage() as HTMLImageElement, {
       frameWidth: 64,
       frameHeight: 64
@@ -78,7 +58,6 @@ export class BootScene extends Phaser.Scene {
       frameHeight: 64
     });
 
-    // Aliens
     this.textures.addSpriteSheet('alien', this.textures.get('alien_sheet').getSourceImage() as HTMLImageElement, {
       frameWidth: 64,
       frameHeight: 64
@@ -92,7 +71,6 @@ export class BootScene extends Phaser.Scene {
       frameHeight: 64
     });
 
-    // Lizards
     this.textures.addSpriteSheet('lizard', this.textures.get('lizard_sheet').getSourceImage() as HTMLImageElement, {
       frameWidth: 64,
       frameHeight: 64
@@ -102,13 +80,11 @@ export class BootScene extends Phaser.Scene {
       frameHeight: 64
     });
 
-    // Boss uses zombie sheet
     this.textures.addSpriteSheet('boss', this.textures.get('zombie_sheet').getSourceImage() as HTMLImageElement, {
       frameWidth: 64,
       frameHeight: 64
     });
 
-    // Projectiles from projs_sheet
     this.textures.addSpriteSheet('bullet', this.textures.get('projs_sheet').getSourceImage() as HTMLImageElement, {
       frameWidth: 16,
       frameHeight: 16
@@ -126,7 +102,6 @@ export class BootScene extends Phaser.Scene {
       frameHeight: 16
     });
 
-    // Bonuses from bonuses_sheet
     this.textures.addSpriteSheet('bonus_health', this.textures.get('bonuses_sheet').getSourceImage() as HTMLImageElement, {
       frameWidth: 32,
       frameHeight: 32
@@ -142,7 +117,6 @@ export class BootScene extends Phaser.Scene {
   }
 
   private createAnimations() {
-    // Player animations
     this.anims.create({
       key: 'player_idle',
       frames: [{ key: 'trooper_sheet', frame: 0 }],
@@ -156,7 +130,6 @@ export class BootScene extends Phaser.Scene {
       repeat: -1
     });
 
-    // Zombie animations
     this.anims.create({
       key: 'zombie_walk',
       frames: this.anims.generateFrameNumbers('zombie_sheet', { start: 0, end: 7 }),
@@ -164,7 +137,6 @@ export class BootScene extends Phaser.Scene {
       repeat: -1
     });
 
-    // Spider animations
     this.anims.create({
       key: 'spider_walk',
       frames: this.anims.generateFrameNumbers('spider_sp1_sheet', { start: 0, end: 7 }),
@@ -172,7 +144,6 @@ export class BootScene extends Phaser.Scene {
       repeat: -1
     });
 
-    // Alien animations
     this.anims.create({
       key: 'alien_walk',
       frames: this.anims.generateFrameNumbers('alien_sheet', { start: 0, end: 7 }),
@@ -180,7 +151,6 @@ export class BootScene extends Phaser.Scene {
       repeat: -1
     });
 
-    // Lizard animations
     this.anims.create({
       key: 'lizard_walk',
       frames: this.anims.generateFrameNumbers('lizard_sheet', { start: 0, end: 7 }),
@@ -192,7 +162,6 @@ export class BootScene extends Phaser.Scene {
   private generateFallbackTextures() {
     const graphics = this.make.graphics({ x: 0, y: 0 });
 
-    // Gun sprite (not in original assets)
     graphics.fillStyle(0x444444, 1);
     graphics.fillRect(0, 2, 24, 6);
     graphics.fillStyle(0x666666, 1);
@@ -202,7 +171,6 @@ export class BootScene extends Phaser.Scene {
     graphics.generateTexture('gun_sprite', 28, 10);
     graphics.clear();
 
-    // XP orb
     graphics.fillStyle(0xffcc00, 1);
     graphics.fillCircle(8, 8, 7);
     graphics.fillStyle(0xffee55, 1);
@@ -210,19 +178,16 @@ export class BootScene extends Phaser.Scene {
     graphics.generateTexture('xp_orb', 16, 16);
     graphics.clear();
 
-    // Hit spark
     graphics.fillStyle(0xffff00, 1);
     graphics.fillCircle(3, 3, 3);
     graphics.generateTexture('hit_spark', 6, 6);
     graphics.clear();
 
-    // Blood particle
     graphics.fillStyle(0x880000, 1);
     graphics.fillCircle(6, 6, 6);
     graphics.generateTexture('blood_particle', 12, 12);
     graphics.clear();
 
-    // Blood decal
     const decalCanvas = document.createElement('canvas');
     decalCanvas.width = 48;
     decalCanvas.height = 48;
@@ -236,7 +201,6 @@ export class BootScene extends Phaser.Scene {
     dctx.fill();
     this.textures.addCanvas('blood_decal', decalCanvas);
 
-    // Muzzle flash
     graphics.fillStyle(0xffaa00, 1);
     graphics.fillCircle(6, 6, 6);
     graphics.fillStyle(0xffff88, 1);
@@ -244,7 +208,6 @@ export class BootScene extends Phaser.Scene {
     graphics.generateTexture('muzzle_flash', 12, 12);
     graphics.clear();
 
-    // Explosion
     const expCanvas = document.createElement('canvas');
     expCanvas.width = 96;
     expCanvas.height = 96;
@@ -259,13 +222,11 @@ export class BootScene extends Phaser.Scene {
     ectx.fill();
     this.textures.addCanvas('explosion', expCanvas);
 
-    // Corpse
     graphics.fillStyle(0x4a3020, 1);
     graphics.fillEllipse(20, 20, 18, 14);
     graphics.generateTexture('corpse', 40, 40);
     graphics.clear();
 
-    // Nest
     graphics.fillStyle(0x4a4a4a, 1);
     graphics.fillCircle(32, 32, 26);
     graphics.fillStyle(0x2a2a2a, 1);
@@ -273,7 +234,6 @@ export class BootScene extends Phaser.Scene {
     graphics.generateTexture('nest', 64, 64);
     graphics.clear();
 
-    // Additional projectile types
     graphics.fillStyle(0x00ffaa, 1);
     graphics.fillRect(0, 1, 20, 2);
     graphics.generateTexture('gauss', 20, 4);
@@ -316,7 +276,6 @@ export class BootScene extends Phaser.Scene {
     graphics.generateTexture('alien_projectile', 8, 8);
     graphics.clear();
 
-    // Bonus sprites
     graphics.fillStyle(0xffcc00, 1);
     graphics.fillCircle(12, 12, 10);
     graphics.generateTexture('bonus_xp', 24, 24);

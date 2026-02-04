@@ -53,9 +53,22 @@ export class Bonus extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
-    if (this.lifespan > this.maxLifespan - 3000) {
-      this.setAlpha(0.5 + 0.5 * Math.sin(this.lifespan * 0.01));
+    const age = this.lifespan / 1000;
+    const timeLeft = (this.maxLifespan - this.lifespan) / 1000;
+    let fade = 1.0;
+
+    if (age < 0.5) {
+      fade = age * 2.0;
+    } else if (timeLeft < 0.5) {
+      fade = timeLeft * 2.0;
     }
+
+    if (timeLeft < 3.0) {
+      const blink = 0.5 + 0.5 * Math.sin(this.lifespan * 0.01);
+      fade = Math.min(fade, blink);
+    }
+
+    this.setAlpha(fade);
 
     if (this.lifespan >= this.maxLifespan) {
       this.destroy();

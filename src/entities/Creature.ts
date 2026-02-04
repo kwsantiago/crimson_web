@@ -22,6 +22,12 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
   private poisonDamageTimer: number = 0;
   private freezePulseTimer: number = 0;
   private isDying: boolean = false;
+  private shadow: Phaser.GameObjects.Sprite;
+  private animPhase: number = 0;
+  private readonly SHADOW_SCALE = 1.07;
+  private readonly SHADOW_ALPHA = 0.4;
+  private readonly SHADOW_OFFSET = 3;
+  private readonly ANIM_RATE = 8;
 
   constructor(
     scene: Phaser.Scene,
@@ -31,7 +37,6 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     projectiles?: Phaser.Physics.Arcade.Group
   ) {
     const data = getCreatureData(type);
-    // Map creature types to their spritesheets
     const sheetMap: Record<string, string> = {
       'zombie': 'zombie_sheet',
       'fast_zombie': 'zombie_sheet',
@@ -56,9 +61,14 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     this.creatureType = type;
     this.projectiles = projectiles;
 
-    // Set scale based on creature size (size/64)
+    this.shadow = scene.add.sprite(x + this.SHADOW_OFFSET, y + this.SHADOW_OFFSET, sheetKey, 0);
+    this.shadow.setTint(0x000000);
+    this.shadow.setAlpha(this.SHADOW_ALPHA);
+    this.shadow.setDepth(4);
+    this.setDepth(5);
+
     this.setScale(data.scale);
-    // Center hitbox within scaled frame
+    this.shadow.setScale(data.scale * this.SHADOW_SCALE);
     const scaledCenter = 32 * data.scale;
     this.setCircle(data.radius, scaledCenter - data.radius, scaledCenter - data.radius);
 
@@ -82,18 +92,26 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     const dt = delta / 1000;
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
 
+    this.shadow.setPosition(this.x + this.SHADOW_OFFSET, this.y + this.SHADOW_OFFSET);
+    this.shadow.setRotation(this.rotation);
+    this.shadow.setFrame(this.frame.name);
+
     if (this.freezeTimer > 0) {
       this.freezeTimer -= dt;
       this.setVelocity(0, 0);
       this.freezePulseTimer += dt;
       const pulse = 0.95 + Math.sin(this.freezePulseTimer * 8) * 0.05;
-      this.setScale(pulse * (getCreatureData(this.creatureType).scale));
+      const baseScale = getCreatureData(this.creatureType).scale;
+      this.setScale(pulse * baseScale);
+      this.shadow.setScale(pulse * baseScale * this.SHADOW_SCALE);
       this.setTint(0x66ddff);
       return;
     } else {
       if (this.freezePulseTimer > 0) {
         this.freezePulseTimer = 0;
-        this.setScale(getCreatureData(this.creatureType).scale);
+        const baseScale = getCreatureData(this.creatureType).scale;
+        this.setScale(baseScale);
+        this.shadow.setScale(baseScale * this.SHADOW_SCALE);
       }
       this.clearTint();
     }
@@ -125,6 +143,8 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
       const heading = Math.atan2(dy, dx);
       this.setRotation(heading);
 
+      let moveSpeed = 0;
+
       if (this.isRanged) {
         this.projectileCooldown -= dt;
         if (dist > 150) {
@@ -132,11 +152,13 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
             (dx / dist) * this.speed,
             (dy / dist) * this.speed
           );
+          moveSpeed = this.speed;
         } else if (dist < 100) {
           this.setVelocity(
             -(dx / dist) * this.speed * 0.5,
             -(dy / dist) * this.speed * 0.5
           );
+          moveSpeed = this.speed * 0.5;
         } else {
           this.setVelocity(0, 0);
         }
@@ -150,6 +172,15 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
           (dx / dist) * this.speed,
           (dy / dist) * this.speed
         );
+        moveSpeed = this.speed;
+      }
+
+      if (moveSpeed > 0) {
+        const speedScale = moveSpeed / 100;
+        this.animPhase += dt * this.ANIM_RATE * speedScale;
+        const frameCount = 16;
+        const frame = Math.floor(this.animPhase) % frameCount;
+        this.setFrame(frame);
       }
     }
   }
@@ -227,7 +258,7 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
       this.clearTint();
 
       this.scene.tweens.add({
-        targets: this,
+        targets: [this, this.shadow],
         alpha: 0,
         scaleX: this.scaleX * 0.5,
         scaleY: this.scaleY * 0.5,
@@ -236,6 +267,7 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
         onComplete: () => {
           this.setActive(false);
           this.setVisible(false);
+          this.shadow.destroy();
         }
       });
     });

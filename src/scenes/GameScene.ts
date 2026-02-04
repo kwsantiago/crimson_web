@@ -16,7 +16,8 @@ import {
   WORLD_HEIGHT,
   SCREEN_WIDTH,
   SCREEN_HEIGHT,
-  getXpForLevel
+  getXpForLevel,
+  UI
 } from '../config';
 
 interface GameSceneData {
@@ -178,26 +179,23 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createBackground() {
-    // Original game: clear color RGB(63, 56, 25), terrain tinted RGB(178, 178, 178) alpha 0.9
     const graphics = this.add.graphics();
-    graphics.fillStyle(0x3f3819, 1);  // RGB(63, 56, 25) - brownish base
+    graphics.fillStyle(0x3f3819, 1);
     graphics.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     graphics.setDepth(-11);
 
-    // Use terrain texture tiled across the world
     const terrain = this.textures.get('terrain');
     if (terrain && terrain.key !== '__MISSING') {
       const terrainWidth = terrain.getSourceImage().width;
       const terrainHeight = terrain.getSourceImage().height;
 
-      // Tile the terrain across the world with tint
       for (let x = 0; x < WORLD_WIDTH; x += terrainWidth) {
         for (let y = 0; y < WORLD_HEIGHT; y += terrainHeight) {
           const tile = this.add.image(x, y, 'terrain');
           tile.setOrigin(0, 0);
           tile.setDepth(-10);
-          tile.setTint(0xb2b2b2);  // RGB(178, 178, 178)
-          tile.setAlpha(0.9);  // alpha 230/255 ≈ 0.9
+          tile.setTint(0xb2b2b2);
+          tile.setAlpha(0.9);
         }
       }
     }
@@ -241,84 +239,92 @@ export class GameScene extends Phaser.Scene {
     this.xpBar.setScrollFactor(0);
     this.xpBar.setDepth(100);
 
-    this.levelText = this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 45, 'Level 1', {
-      fontSize: '16px',
-      color: '#ffffff',
-      fontFamily: 'Arial'
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(100);
+    this.levelText = this.add.text(8, 68, 'Lv 1', {
+      fontSize: '14px',
+      color: '#dcdcdc',
+      fontFamily: 'Arial Black'
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(100);
 
     this.killText = this.add.text(SCREEN_WIDTH - 16, 16, 'Kills: 0', {
-      fontSize: '16px',
-      color: '#ffffff',
+      fontSize: '14px',
+      color: '#dcdcdc',
       fontFamily: 'Arial'
     }).setOrigin(1, 0).setScrollFactor(0).setDepth(100);
 
     const modeConfig = GAME_MODE_CONFIGS[this.gameMode];
-    const modeColor = this.gameMode === GameMode.RUSH ? '#ff9f43' : '#4ecdc4';
-    this.modeIndicator = this.add.text(SCREEN_WIDTH - 16, 40, modeConfig.name.toUpperCase(), {
-      fontSize: '12px',
+    const modeColor = this.gameMode === GameMode.RUSH ? '#f0c850' : '#46b4f0';
+    this.modeIndicator = this.add.text(SCREEN_WIDTH - 16, 36, modeConfig.name.toUpperCase(), {
+      fontSize: '11px',
       color: modeColor,
       fontFamily: 'Arial Black'
     }).setOrigin(1, 0).setScrollFactor(0).setDepth(100);
 
-    this.weaponText = this.add.text(SCREEN_WIDTH - 16, SCREEN_HEIGHT - 48, 'Pistol', {
-      fontSize: '14px',
-      color: '#ffffff',
+    this.weaponText = this.add.text(SCREEN_WIDTH - 16, SCREEN_HEIGHT - 42, 'Pistol', {
+      fontSize: '13px',
+      color: '#dcdcdc',
       fontFamily: 'Arial'
     }).setOrigin(1, 1).setScrollFactor(0).setDepth(100);
 
-    this.ammoText = this.add.text(SCREEN_WIDTH - 16, SCREEN_HEIGHT - 28, '12 / 12', {
-      fontSize: '18px',
-      color: '#ffffff',
-      fontFamily: 'Arial'
+    this.ammoText = this.add.text(SCREEN_WIDTH - 16, SCREEN_HEIGHT - 24, '12 / 12', {
+      fontSize: '16px',
+      color: '#dcdcdc',
+      fontFamily: 'Arial Black'
     }).setOrigin(1, 1).setScrollFactor(0).setDepth(100);
 
     this.reloadText = this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 50, 'RELOADING', {
-      fontSize: '20px',
-      color: '#ffff00',
-      fontFamily: 'Arial Black'
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setVisible(false);
-
-    this.perkPromptText = this.add.text(SCREEN_WIDTH / 2, 80, 'Press P to choose a perk!', {
       fontSize: '18px',
-      color: '#ffd93d',
+      color: '#f0c850',
       fontFamily: 'Arial Black'
     }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setVisible(false);
 
-    this.add.text(16, 16, 'Weapons: 1-9, 0', {
-      fontSize: '12px',
-      color: '#888888',
+    this.perkPromptText = this.add.text(SCREEN_WIDTH / 2, 60, 'Press P to choose a perk!', {
+      fontSize: '16px',
+      color: '#f0c850',
+      fontFamily: 'Arial Black'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setVisible(false);
+
+    this.add.text(8, SCREEN_HEIGHT - 24, 'WASD Move | R Reload | P Perks', {
+      fontSize: '10px',
+      color: '#aaaab4',
       fontFamily: 'Arial'
     }).setScrollFactor(0).setDepth(100);
 
-    this.add.text(16, 32, 'R: Reload  P: Perks', {
-      fontSize: '12px',
-      color: '#888888',
-      fontFamily: 'Arial'
-    }).setScrollFactor(0).setDepth(100);
-
-    this.powerupIcons = this.add.container(SCREEN_WIDTH - 40, 70);
+    this.powerupIcons = this.add.container(8, 90);
     this.powerupIcons.setScrollFactor(0);
     this.powerupIcons.setDepth(100);
   }
 
   private updateHUD() {
     this.healthBar.clear();
-    this.healthBar.fillStyle(0x440000, 1);
-    this.healthBar.fillRect(16, SCREEN_HEIGHT - 32, 150, 16);
-    this.healthBar.fillStyle(0xff0000, 1);
-    const healthWidth = Math.max(0, (this.player.health / this.player.maxHealth) * 150);
-    this.healthBar.fillRect(16, SCREEN_HEIGHT - 32, healthWidth, 16);
+
+    this.healthBar.fillStyle(UI.COLORS.SHADOW, UI.ALPHA.SHADOW);
+    this.healthBar.fillRoundedRect(8 + UI.SHADOW_OFFSET, 8 + UI.SHADOW_OFFSET, 124, 52, 4);
+
+    this.healthBar.fillStyle(0x1a1612, UI.ALPHA.PANEL);
+    this.healthBar.fillRoundedRect(8, 8, 124, 52, 4);
+    this.healthBar.lineStyle(1, 0x3d3830, 0.8);
+    this.healthBar.strokeRoundedRect(8, 8, 124, 52, 4);
+
+    this.healthBar.fillStyle(UI.COLORS.HEALTH_BAR_BG, UI.ALPHA.HEALTH_BG);
+    this.healthBar.fillRect(12, 16, 116, 9);
+    this.healthBar.fillStyle(UI.COLORS.HEALTH_BAR, UI.ALPHA.ICON);
+    const healthWidth = Math.max(0, (this.player.health / this.player.maxHealth) * 116);
+    this.healthBar.fillRect(12, 16, healthWidth, 9);
 
     this.xpBar.clear();
-    this.xpBar.fillStyle(0x444400, 1);
-    this.xpBar.fillRect(SCREEN_WIDTH / 2 - 100, SCREEN_HEIGHT - 20, 200, 12);
-    this.xpBar.fillStyle(0xffff00, 1);
-    const xpNeeded = getXpForLevel(this.player.level);
-    const xpWidth = (this.player.experience / xpNeeded) * 200;
-    this.xpBar.fillRect(SCREEN_WIDTH / 2 - 100, SCREEN_HEIGHT - 20, xpWidth, 12);
 
-    this.levelText.setText(`Level ${this.player.level}`);
+    this.xpBar.fillStyle(UI.COLORS.XP_BAR_BG, 0.6);
+    this.xpBar.fillRect(12, 48, 116, 8);
+    this.xpBar.fillStyle(UI.COLORS.XP_BAR, 1);
+    const xpNeeded = getXpForLevel(this.player.level);
+    const xpWidth = Math.min(116, (this.player.experience / xpNeeded) * 116);
+    this.xpBar.fillRect(12, 48, xpWidth, 8);
+
+    this.healthBar.fillStyle(0xcc3333, 0.8);
+    const heartPulse = Math.sin(this.time.now * 0.005) * 2 + 10;
+    this.healthBar.fillCircle(24, 38, heartPulse);
+
+    this.levelText.setText(`Lv ${this.player.level}`);
     this.killText.setText(`Kills: ${this.killCount}`);
 
     const wm = this.player.weaponManager;
@@ -327,10 +333,10 @@ export class GameScene extends Phaser.Scene {
 
     if (wm.isCurrentlyReloading) {
       this.reloadText.setVisible(true);
-      this.ammoText.setColor('#ffff00');
+      this.ammoText.setColor('#f0c850');
     } else {
       this.reloadText.setVisible(false);
-      this.ammoText.setColor('#ffffff');
+      this.ammoText.setColor('#dcdcdc');
     }
 
     if (this.pendingPerks > 0 && !this.perkSelector.isOpen()) {
@@ -347,38 +353,53 @@ export class GameScene extends Phaser.Scene {
     this.powerupIcons.removeAll(true);
 
     let y = 0;
-    const spacing = 30;
+    const spacing = 44;
+
+    const drawBonusSlot = (icon: Phaser.GameObjects.Sprite, label: string, timer: number, barColor: number) => {
+      const panel = this.add.graphics();
+      panel.fillStyle(0x1a1612, 0.7);
+      panel.fillRoundedRect(-4, y - 14, 120, 40, 4);
+      panel.lineStyle(1, 0x3d3830, 0.5);
+      panel.strokeRoundedRect(-4, y - 14, 120, 40, 4);
+      this.powerupIcons.add(panel);
+
+      icon.setScale(0.7);
+      this.powerupIcons.add(icon);
+
+      const labelText = this.add.text(36, y - 4, label, {
+        fontSize: '11px',
+        color: '#dcdcdc',
+        fontFamily: 'Arial'
+      }).setOrigin(0, 0.5);
+      this.powerupIcons.add(labelText);
+
+      const barBg = this.add.graphics();
+      barBg.fillStyle(UI.COLORS.XP_BAR_BG, 0.5);
+      barBg.fillRect(36, y + 6, 70, 6);
+      this.powerupIcons.add(barBg);
+
+      const barFill = this.add.graphics();
+      const ratio = Math.min(1, timer / 20);
+      barFill.fillStyle(barColor, 0.8);
+      barFill.fillRect(36, y + 6, 70 * ratio, 6);
+      this.powerupIcons.add(barFill);
+    };
 
     if (this.player.hasActiveShield()) {
-      const icon = this.add.sprite(0, y, 'bonus_shield').setScale(0.8);
-      const text = this.add.text(20, y, `${Math.ceil(this.player.shieldTimer)}s`, {
-        fontSize: '12px',
-        color: '#00ffff'
-      }).setOrigin(0, 0.5);
-      this.powerupIcons.add(icon);
-      this.powerupIcons.add(text);
+      const icon = this.add.sprite(14, y, 'bonus_shield');
+      drawBonusSlot(icon, 'Shield', this.player.shieldTimer, 0x00aaff);
       y += spacing;
     }
 
     if (this.player.hasActiveSpeed()) {
-      const icon = this.add.sprite(0, y, 'bonus_speed').setScale(0.8);
-      const text = this.add.text(20, y, `${Math.ceil(this.player.speedBoostTimer)}s`, {
-        fontSize: '12px',
-        color: '#00ff00'
-      }).setOrigin(0, 0.5);
-      this.powerupIcons.add(icon);
-      this.powerupIcons.add(text);
+      const icon = this.add.sprite(14, y, 'bonus_speed');
+      drawBonusSlot(icon, 'Speed', this.player.speedBoostTimer, 0x00ff44);
       y += spacing;
     }
 
     if (this.player.hasActiveReflex()) {
-      const icon = this.add.sprite(0, y, 'bonus_reflex').setScale(0.8);
-      const text = this.add.text(20, y, `${Math.ceil(this.player.reflexBoostTimer)}s`, {
-        fontSize: '12px',
-        color: '#ff00ff'
-      }).setOrigin(0, 0.5);
-      this.powerupIcons.add(icon);
-      this.powerupIcons.add(text);
+      const icon = this.add.sprite(14, y, 'bonus_reflex');
+      drawBonusSlot(icon, 'Reflex', this.player.reflexBoostTimer, 0xff00ff);
     }
   }
 
@@ -755,61 +776,152 @@ export class GameScene extends Phaser.Scene {
       SCREEN_WIDTH,
       SCREEN_HEIGHT,
       0x000000,
-      0.7
+      0.8
     ).setDepth(200);
 
-    this.add.text(centerX, centerY - 100, 'GAME OVER', {
-      fontSize: '48px',
-      color: '#ff6b6b',
-      fontFamily: 'Arial Black'
+    const panelW = UI.GAME_OVER.PANEL_W;
+    const panelH = UI.GAME_OVER.PANEL_H;
+
+    const panelGraphics = this.add.graphics();
+    panelGraphics.setDepth(200);
+
+    panelGraphics.fillStyle(UI.COLORS.SHADOW, UI.ALPHA.SHADOW);
+    panelGraphics.fillRoundedRect(
+      centerX - panelW / 2 + UI.SHADOW_OFFSET,
+      centerY - panelH / 2 + UI.SHADOW_OFFSET,
+      panelW,
+      panelH,
+      8
+    );
+
+    panelGraphics.fillStyle(0x1a1612, UI.ALPHA.PANEL);
+    panelGraphics.fillRoundedRect(centerX - panelW / 2, centerY - panelH / 2, panelW, panelH, 8);
+
+    panelGraphics.lineStyle(2, 0x3d3830, 0.8);
+    panelGraphics.strokeRoundedRect(centerX - panelW / 2, centerY - panelH / 2, panelW, panelH, 8);
+
+    panelGraphics.lineStyle(1, 0x4a4438, 0.5);
+    panelGraphics.strokeRoundedRect(
+      centerX - panelW / 2 + 4,
+      centerY - panelH / 2 + 4,
+      panelW - 8,
+      panelH - 8,
+      6
+    );
+
+    this.add.text(centerX, centerY - 90, 'THE REAPER', {
+      fontSize: '32px',
+      color: '#cc3333',
+      fontFamily: 'Arial Black',
+      stroke: '#000000',
+      strokeThickness: 2,
     }).setOrigin(0.5).setDepth(201);
 
     const modeConfig = GAME_MODE_CONFIGS[this.gameMode];
-    const modeColor = this.gameMode === GameMode.RUSH ? '#ff9f43' : '#4ecdc4';
+    const modeColor = this.gameMode === GameMode.RUSH ? '#f0c850' : '#46b4f0';
     this.add.text(centerX, centerY - 55, modeConfig.name.toUpperCase() + ' MODE', {
-      fontSize: '18px',
+      fontSize: '14px',
       color: modeColor,
       fontFamily: 'Arial Black'
     }).setOrigin(0.5).setDepth(201);
 
     const score = this.killCount * 100 + this.player.level * 500 + Math.floor(timePlayed / 100);
     const finalScore = this.gameMode === GameMode.RUSH ? Math.floor(score * 1.2) : score;
-    this.add.text(centerX, centerY - 15, `Score: ${finalScore}`, {
-      fontSize: '28px',
-      color: '#ffd93d',
+
+    this.add.text(centerX - 80, centerY - 25, 'Score', {
+      fontSize: '13px',
+      color: '#e6e6e6',
+      fontFamily: 'Arial'
+    }).setOrigin(0.5).setDepth(201);
+
+    this.add.text(centerX - 80, centerY - 5, `${finalScore}`, {
+      fontSize: '18px',
+      color: '#e6e6ff',
       fontFamily: 'Arial Black'
     }).setOrigin(0.5).setDepth(201);
 
     if (isHighScore) {
-      this.add.text(centerX, centerY + 25, `NEW HIGH SCORE! Rank #${rank}`, {
-        fontSize: '20px',
-        color: '#00ff00',
-        fontFamily: 'Arial Black'
+      this.add.text(centerX - 80, centerY + 18, `Rank: ${this.getOrdinal(rank)}`, {
+        fontSize: '12px',
+        color: '#f0c850',
+        fontFamily: 'Arial'
       }).setOrigin(0.5).setDepth(201);
     }
 
-    this.add.text(centerX, centerY + 65, `Kills: ${this.killCount}  |  Level: ${this.player.level}`, {
-      fontSize: '18px',
-      color: '#ffffff',
+    panelGraphics.lineStyle(1, 0x3d3830, 0.5);
+    panelGraphics.lineBetween(centerX - 20, centerY - 30, centerX - 20, centerY + 30);
+
+    this.add.text(centerX + 60, centerY - 25, 'Game time', {
+      fontSize: '13px',
+      color: '#e6e6e6',
       fontFamily: 'Arial'
     }).setOrigin(0.5).setDepth(201);
 
-    this.add.text(centerX, centerY + 95, `Time: ${this.highScoreManager.formatTime(timePlayed)}`, {
-      fontSize: '18px',
-      color: '#ffffff',
-      fontFamily: 'Arial'
-    }).setOrigin(0.5).setDepth(201);
-
-    this.add.text(centerX, centerY + 140, 'Click to return to menu', {
+    this.add.text(centerX + 60, centerY - 5, this.highScoreManager.formatTime(timePlayed), {
       fontSize: '16px',
-      color: '#888888',
+      color: '#dcdcdc',
       fontFamily: 'Arial'
     }).setOrigin(0.5).setDepth(201);
 
-    this.time.delayedCall(500, () => {
-      this.input.once('pointerdown', () => {
-        this.scene.start('MenuScene');
-      });
+    this.add.text(centerX, centerY + 50, `Frags: ${this.killCount}`, {
+      fontSize: '14px',
+      color: '#e6e6e6',
+      fontFamily: 'Arial'
+    }).setOrigin(0.5).setDepth(201);
+
+    this.add.text(centerX, centerY + 72, `Level: ${this.player.level}`, {
+      fontSize: '14px',
+      color: '#e6e6e6',
+      fontFamily: 'Arial'
+    }).setOrigin(0.5).setDepth(201);
+
+    const playAgainBtn = this.createGameOverButton(centerX - 80, centerY + 105, 'Play Again', () => {
+      this.scene.start('GameScene', { gameMode: this.gameMode });
     });
+    playAgainBtn.setDepth(201);
+
+    const menuBtn = this.createGameOverButton(centerX + 80, centerY + 105, 'Main Menu', () => {
+      this.scene.start('MenuScene');
+    });
+    menuBtn.setDepth(201);
+  }
+
+  private createGameOverButton(x: number, y: number, label: string, callback: () => void): Phaser.GameObjects.Container {
+    const container = this.add.container(x, y);
+    const btnW = 130;
+    const btnH = 28;
+
+    const bg = this.add.rectangle(0, 0, btnW, btnH, 0x222222, 0.9);
+    bg.setStrokeStyle(2, 0x444444);
+    bg.setInteractive({ useHandCursor: true });
+
+    const text = this.add.text(0, 0, label, {
+      fontSize: '13px',
+      color: '#dcdcdc',
+      fontFamily: 'Arial Black'
+    }).setOrigin(0.5);
+
+    bg.on('pointerover', () => {
+      bg.setFillStyle(0x404070, 0.9);
+      bg.setStrokeStyle(2, 0x8080b0);
+      text.setColor('#ffffff');
+    });
+
+    bg.on('pointerout', () => {
+      bg.setFillStyle(0x222222, 0.9);
+      bg.setStrokeStyle(2, 0x444444);
+      text.setColor('#dcdcdc');
+    });
+
+    bg.on('pointerdown', callback);
+
+    container.add([bg, text]);
+    return container;
+  }
+
+  private getOrdinal(n: number): string {
+    const s = ['th', 'st', 'nd', 'rd'];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
   }
 }

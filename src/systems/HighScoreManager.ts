@@ -51,7 +51,6 @@ export class HighScoreManager {
       const key = this.getStorageKey(mode);
       localStorage.setItem(key, JSON.stringify(this.scores[mode]));
     } catch {
-      // Storage full or unavailable
     }
   }
 
