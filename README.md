@@ -2,9 +2,22 @@
 
 Browser-based clone of Crimsonland (2003) built with Phaser 3 and TypeScript.
 
-## Play
+## Setup
 
+1. Clone the [crimson](https://github.com/banteg/crimson) Python reimplementation:
 ```bash
+git clone https://github.com/banteg/crimson.git
+cd crimson
+```
+
+2. Extract assets (auto-downloads .paq files on first run):
+```bash
+uv run crimson extract ~/.local/share/banteg/crimsonland /path/to/crimson_web/public/assets/game
+```
+
+3. Install and run:
+```bash
+cd /path/to/crimson_web
 bun install
 bun run dev
 ```

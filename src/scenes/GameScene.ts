@@ -178,21 +178,29 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createBackground() {
+    // Original game: clear color RGB(63, 56, 25), terrain tinted RGB(178, 178, 178) alpha 0.9
     const graphics = this.add.graphics();
-    graphics.fillStyle(0x2d3436, 1);
+    graphics.fillStyle(0x3f3819, 1);  // RGB(63, 56, 25) - brownish base
     graphics.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    graphics.setDepth(-11);
 
-    graphics.lineStyle(1, 0x636e72, 0.3);
-    const gridSize = 64;
-    for (let x = 0; x <= WORLD_WIDTH; x += gridSize) {
-      graphics.moveTo(x, 0);
-      graphics.lineTo(x, WORLD_HEIGHT);
+    // Use terrain texture tiled across the world
+    const terrain = this.textures.get('terrain');
+    if (terrain && terrain.key !== '__MISSING') {
+      const terrainWidth = terrain.getSourceImage().width;
+      const terrainHeight = terrain.getSourceImage().height;
+
+      // Tile the terrain across the world with tint
+      for (let x = 0; x < WORLD_WIDTH; x += terrainWidth) {
+        for (let y = 0; y < WORLD_HEIGHT; y += terrainHeight) {
+          const tile = this.add.image(x, y, 'terrain');
+          tile.setOrigin(0, 0);
+          tile.setDepth(-10);
+          tile.setTint(0xb2b2b2);  // RGB(178, 178, 178)
+          tile.setAlpha(0.9);  // alpha 230/255 ≈ 0.9
+        }
+      }
     }
-    for (let y = 0; y <= WORLD_HEIGHT; y += gridSize) {
-      graphics.moveTo(0, y);
-      graphics.lineTo(WORLD_WIDTH, y);
-    }
-    graphics.strokePath();
   }
 
   private createParticleSystems() {

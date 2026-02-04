@@ -31,7 +31,24 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     projectiles?: Phaser.Physics.Arcade.Group
   ) {
     const data = getCreatureData(type);
-    super(scene, x, y, type);
+    // Map creature types to their spritesheets
+    const sheetMap: Record<string, string> = {
+      'zombie': 'zombie_sheet',
+      'fast_zombie': 'zombie_sheet',
+      'big_zombie': 'zombie_sheet',
+      'spider': 'spider_sp1_sheet',
+      'baby_spider': 'spider_sp1_sheet',
+      'spider_mother': 'spider_sp2_sheet',
+      'alien': 'alien_sheet',
+      'alien_elite': 'alien_sheet',
+      'alien_boss': 'alien_sheet',
+      'lizard': 'lizard_sheet',
+      'lizard_spitter': 'lizard_sheet',
+      'nest': 'nest',
+      'boss': 'zombie_sheet'
+    };
+    const sheetKey = sheetMap[type] || type;
+    super(scene, x, y, sheetKey, 0);
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -39,10 +56,11 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     this.creatureType = type;
     this.projectiles = projectiles;
 
-    const offsetX = (14 - data.radius);
-    const offsetY = (14 - data.radius);
-    this.setCircle(data.radius, offsetX > 0 ? offsetX : 0, offsetY > 0 ? offsetY : 0);
+    // Set scale based on creature size (size/64)
     this.setScale(data.scale);
+    // Center hitbox within scaled frame
+    const scaledCenter = 32 * data.scale;
+    this.setCircle(data.radius, scaledCenter - data.radius, scaledCenter - data.radius);
 
     this.health = data.health;
     this.maxHealth = data.health;

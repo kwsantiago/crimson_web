@@ -33,6 +33,10 @@ export interface CreatureData {
   spawnType?: CreatureType;
 }
 
+// Original game sizes from decompiled code (in game units):
+// zombie: 64, big zombie: 80, spider: 50/40, alien: 55/65, lizard: 32
+// Scale = size/64 to match original game rendering
+
 export const CREATURES: Record<CreatureType, CreatureData> = {
   [CreatureType.ZOMBIE]: {
     type: CreatureType.ZOMBIE,
@@ -42,8 +46,8 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 10,
     xp: 10,
     radius: 14,
-    scale: 1.0,
-    tint: 0xff6b6b,
+    scale: 1.0,  // size 64
+    tint: 0xffffff,
     isRanged: false
   },
   [CreatureType.FAST_ZOMBIE]: {
@@ -54,8 +58,8 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 8,
     xp: 15,
     radius: 12,
-    scale: 0.9,
-    tint: 0xcc4444,
+    scale: 0.85,  // slightly smaller
+    tint: 0xffffff,
     isRanged: false
   },
   [CreatureType.BIG_ZOMBIE]: {
@@ -66,8 +70,8 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 20,
     xp: 35,
     radius: 18,
-    scale: 1.4,
-    tint: 0x993333,
+    scale: 1.25,  // size 80
+    tint: 0xffffff,
     isRanged: false
   },
   [CreatureType.SPIDER]: {
@@ -78,8 +82,8 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 5,
     xp: 8,
     radius: 8,
-    scale: 0.6,
-    tint: 0x9b59b6,
+    scale: 0.78,  // size 50
+    tint: 0xffffff,
     isRanged: false
   },
   [CreatureType.BABY_SPIDER]: {
@@ -90,8 +94,8 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 2,
     xp: 3,
     radius: 5,
-    scale: 0.4,
-    tint: 0xbb77cc,
+    scale: 0.625,  // size 40 -> 40/64
+    tint: 0xffffff,
     isRanged: false
   },
   [CreatureType.SPIDER_MOTHER]: {
@@ -102,8 +106,8 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 15,
     xp: 50,
     radius: 20,
-    scale: 1.5,
-    tint: 0x8e44ad,
+    scale: 1.0,  // size 64
+    tint: 0xffffff,
     isRanged: false,
     spawnsOnDeath: CreatureType.BABY_SPIDER,
     spawnCount: 6
@@ -116,8 +120,8 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 0,
     xp: 25,
     radius: 14,
-    scale: 1.0,
-    tint: 0x27ae60,
+    scale: 0.86,  // size 55
+    tint: 0xffffff,
     isRanged: true,
     projectileCooldown: 2.0
   },
@@ -129,8 +133,8 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 0,
     xp: 50,
     radius: 16,
-    scale: 1.2,
-    tint: 0x2ecc71,
+    scale: 1.016,  // size 65 -> 65/64
+    tint: 0xffffff,
     isRanged: true,
     projectileCooldown: 1.2
   },
@@ -142,8 +146,8 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 20,
     xp: 200,
     radius: 28,
-    scale: 2.0,
-    tint: 0x1abc9c,
+    scale: 1.5,  // larger boss
+    tint: 0xffffff,
     isRanged: true,
     projectileCooldown: 0.8
   },
@@ -155,8 +159,8 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 12,
     xp: 20,
     radius: 12,
-    scale: 0.9,
-    tint: 0xe67e22,
+    scale: 0.5,  // size 32
+    tint: 0xffffff,
     isRanged: false
   },
   [CreatureType.LIZARD_SPITTER]: {
@@ -167,8 +171,8 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 0,
     xp: 30,
     radius: 12,
-    scale: 0.95,
-    tint: 0xd35400,
+    scale: 0.5,  // size 32
+    tint: 0xffffff,
     isRanged: true,
     projectileCooldown: 1.5
   },
@@ -180,8 +184,8 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 0,
     xp: 100,
     radius: 24,
-    scale: 1.2,
-    tint: 0x7f8c8d,
+    scale: 0.78,  // size 50
+    tint: 0xffffff,
     isRanged: false,
     isStationary: true,
     spawnTimer: 5.0,
@@ -195,8 +199,8 @@ export const CREATURES: Record<CreatureType, CreatureData> = {
     damage: 30,
     xp: 500,
     radius: 32,
-    scale: 2.5,
-    tint: 0xe74c3c,
+    scale: 1.5,  // big boss
+    tint: 0xffffff,
     isRanged: true,
     projectileCooldown: 0.5
   }

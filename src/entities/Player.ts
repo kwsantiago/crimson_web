@@ -5,8 +5,6 @@ import {
   PLAYER_BASE_SPEED,
   PLAYER_MAX_HEALTH,
   PLAYER_RADIUS,
-  WORLD_WIDTH,
-  WORLD_HEIGHT,
   getXpForLevel
 } from '../config';
 
@@ -18,7 +16,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   weaponManager: WeaponManager;
   perkManager: PerkManager;
   private muzzleFlash: Phaser.GameObjects.Sprite;
-  private muzzleFlashTimer: number = 0;
+  private muzzleFlashAlpha: number = 0;
   private keys: {
     W: Phaser.Input.Keyboard.Key;
     A: Phaser.Input.Keyboard.Key;
@@ -32,17 +30,57 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private regenTimer: number = 0;
   private passiveXpTimer: number = 0;
   private shieldSprite?: Phaser.GameObjects.Arc;
-  private gunSprite: Phaser.GameObjects.Sprite;
   private aimAngle: number = 0;
+  private moveAngle: number = 0;
+  private movePhase: number = 0;
+  private isMoving: boolean = false;
+
+  // Two-layer sprite system like original game
+  private legSprite: Phaser.GameObjects.Sprite;
+  private torsoSprite: Phaser.GameObjects.Sprite;
+  private legShadow: Phaser.GameObjects.Sprite;
+  private torsoShadow: Phaser.GameObjects.Sprite;
+
+  private readonly PLAYER_SCALE = 50.0 / 64.0;  // Original: 50 world units, 64px cell
 
   constructor(scene: Phaser.Scene, x: number, y: number, projectiles: Phaser.Physics.Arcade.Group) {
-    super(scene, x, y, 'player');
+    // Base sprite for physics only (invisible)
+    super(scene, x, y, 'trooper_sheet', 0);
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
-    this.setCircle(PLAYER_RADIUS, 16 - PLAYER_RADIUS, 16 - PLAYER_RADIUS);
+    // Physics body setup
+    this.setScale(this.PLAYER_SCALE);
+    const scaledCenter = 32 * this.PLAYER_SCALE;
+    this.setCircle(PLAYER_RADIUS, scaledCenter - PLAYER_RADIUS, scaledCenter - PLAYER_RADIUS);
     this.setCollideWorldBounds(true);
+    this.setVisible(false);  // Hide base sprite, we draw legs+torso separately
+
+    // Create shadow sprites (drawn first, behind player)
+    this.legShadow = scene.add.sprite(x, y, 'trooper_sheet', 0);
+    this.legShadow.setScale(this.PLAYER_SCALE * 1.02);  // Shadow 1.02x
+    this.legShadow.setTint(0x000000);
+    this.legShadow.setAlpha(0.35);  // ~90/255
+    this.legShadow.setDepth(4);
+
+    this.torsoShadow = scene.add.sprite(x, y, 'trooper_sheet', 16);
+    this.torsoShadow.setScale(this.PLAYER_SCALE * 1.03);  // Shadow 1.03x
+    this.torsoShadow.setTint(0x000000);
+    this.torsoShadow.setAlpha(0.35);
+    this.torsoShadow.setDepth(4);
+
+    // Create leg sprite (frames 0-15)
+    this.legSprite = scene.add.sprite(x, y, 'trooper_sheet', 0);
+    this.legSprite.setScale(this.PLAYER_SCALE);
+    this.legSprite.setTint(0xf0f0ff);  // Original: RGB(240, 240, 255)
+    this.legSprite.setDepth(5);
+
+    // Create torso sprite (frames 16-31)
+    this.torsoSprite = scene.add.sprite(x, y, 'trooper_sheet', 16);
+    this.torsoSprite.setScale(this.PLAYER_SCALE);
+    this.torsoSprite.setTint(0xf0f0ff);
+    this.torsoSprite.setDepth(6);
 
     this.health = PLAYER_MAX_HEALTH;
     this.maxHealth = PLAYER_MAX_HEALTH;
@@ -62,10 +100,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.muzzleFlash.setVisible(false);
     this.muzzleFlash.setDepth(10);
 
-    this.gunSprite = scene.add.sprite(x, y, 'gun_sprite');
-    this.gunSprite.setOrigin(0.2, 0.5);
-    this.gunSprite.setDepth(11);
-
     const keyboard = scene.input.keyboard!;
     this.keys = {
       W: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
@@ -84,10 +118,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     this.updateTimers(dt);
     this.weaponManager.update(delta);
-    this.handleMovement();
+    this.handleMovement(dt);
     this.handleAiming(pointer);
     this.handleShooting(pointer);
-    this.updateMuzzleFlash(delta);
+    this.updateSprites();
+    this.updateMuzzleFlash(dt);
     this.updateShieldVisual();
 
     const regenRate = this.perkManager.getRegenRate();
@@ -121,9 +156,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.reflexBoostTimer > 0) {
       this.reflexBoostTimer -= dt;
     }
+    // Decay muzzle flash
+    if (this.muzzleFlashAlpha > 0) {
+      this.muzzleFlashAlpha -= dt * 10;
+      if (this.muzzleFlashAlpha < 0) this.muzzleFlashAlpha = 0;
+    }
   }
 
-  private handleMovement() {
+  private handleMovement(dt: number) {
     let vx = 0;
     let vy = 0;
 
@@ -132,9 +172,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.keys.W.isDown) vy -= 1;
     if (this.keys.S.isDown) vy += 1;
 
+    this.isMoving = vx !== 0 || vy !== 0;
+
     if (vx !== 0 && vy !== 0) {
       vx *= 0.7071;
       vy *= 0.7071;
+    }
+
+    if (this.isMoving) {
+      this.moveAngle = Math.atan2(vy, vx);
+      // Animate walk cycle (0-14 frames)
+      this.movePhase += dt * 12;  // Animation speed
+      if (this.movePhase >= 15) this.movePhase -= 15;
     }
 
     let speed = PLAYER_BASE_SPEED;
@@ -149,43 +198,70 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   private handleAiming(pointer: Phaser.Input.Pointer) {
     const worldPoint = this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
-    const angle = Phaser.Math.Angle.Between(this.x, this.y, worldPoint.x, worldPoint.y);
-    this.aimAngle = angle;
-    this.setRotation(angle);
-    this.updateGunSprite();
+    this.aimAngle = Phaser.Math.Angle.Between(this.x, this.y, worldPoint.x, worldPoint.y);
   }
 
-  private updateGunSprite() {
-    const gunOffset = 8;
-    this.gunSprite.setPosition(
-      this.x + Math.cos(this.aimAngle) * gunOffset,
-      this.y + Math.sin(this.aimAngle) * gunOffset
-    );
-    this.gunSprite.setRotation(this.aimAngle);
-    this.gunSprite.setFlipY(Math.abs(this.aimAngle) > Math.PI / 2);
+  private updateSprites() {
+    // Calculate leg and torso frames
+    const legFrame = Math.max(0, Math.min(14, Math.floor(this.movePhase)));
+    const torsoFrame = legFrame + 16;
+
+    // Sprites face UP at rotation 0, so add PI/2 to convert from heading (0=right) to sprite rotation
+    const SPRITE_OFFSET = Math.PI / 2;
+    const legRotation = (this.isMoving ? this.moveAngle : this.aimAngle) + SPRITE_OFFSET;
+    const torsoRotation = this.aimAngle + SPRITE_OFFSET;
+
+    // Update leg sprite
+    this.legSprite.setFrame(legFrame);
+    this.legSprite.setPosition(this.x, this.y);
+    this.legSprite.setRotation(legRotation);
+
+    // Calculate recoil offset for torso (perpendicular to aim)
+    const recoilDir = this.aimAngle + Math.PI / 2;
+    const recoilAmount = this.muzzleFlashAlpha * 3;
+    const recoilX = Math.cos(recoilDir) * recoilAmount;
+    const recoilY = Math.sin(recoilDir) * recoilAmount;
+
+    // Update torso sprite
+    this.torsoSprite.setFrame(torsoFrame);
+    this.torsoSprite.setPosition(this.x + recoilX, this.y + recoilY);
+    this.torsoSprite.setRotation(torsoRotation);
+
+    // Update shadows with offset
+    const baseSize = 50.0 * this.PLAYER_SCALE;
+    const legShadowOff = 3.0 + baseSize * 0.01;
+    const torsoShadowOff = 1.0 + baseSize * 0.015;
+
+    this.legShadow.setFrame(legFrame);
+    this.legShadow.setPosition(this.x + legShadowOff, this.y + legShadowOff);
+    this.legShadow.setRotation(legRotation);
+
+    this.torsoShadow.setFrame(torsoFrame);
+    this.torsoShadow.setPosition(this.x + recoilX + torsoShadowOff, this.y + recoilY + torsoShadowOff);
+    this.torsoShadow.setRotation(torsoRotation);
   }
 
   private handleShooting(pointer: Phaser.Input.Pointer) {
     if (pointer.isDown) {
-      this.weaponManager.fire(this.x, this.y, this.rotation, () => this.showMuzzleFlash());
+      this.weaponManager.fire(this.x, this.y, this.aimAngle, () => this.showMuzzleFlash());
     }
   }
 
   private showMuzzleFlash() {
-    this.muzzleFlashTimer = 50;
+    this.muzzleFlashAlpha = 1.0;
     this.muzzleFlash.setVisible(true);
   }
 
-  private updateMuzzleFlash(delta: number) {
-    if (this.muzzleFlashTimer > 0) {
-      this.muzzleFlashTimer -= delta;
-      const offset = 24;
+  private updateMuzzleFlash(dt: number) {
+    if (this.muzzleFlashAlpha > 0) {
+      const offset = 20;
       this.muzzleFlash.setPosition(
         this.x + Math.cos(this.aimAngle) * offset,
         this.y + Math.sin(this.aimAngle) * offset
       );
       this.muzzleFlash.setRotation(this.aimAngle);
-      if (this.muzzleFlashTimer <= 0) {
+      this.muzzleFlash.setAlpha(this.muzzleFlashAlpha * 0.8);
+      if (this.muzzleFlashAlpha <= 0.1) {
         this.muzzleFlash.setVisible(false);
       }
     }
@@ -194,8 +270,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private updateShieldVisual() {
     if (this.shieldTimer > 0) {
       if (!this.shieldSprite) {
-        this.shieldSprite = this.scene.add.circle(this.x, this.y, 24, 0x00ffff, 0.3);
-        this.shieldSprite.setStrokeStyle(2, 0x00ffff);
+        this.shieldSprite = this.scene.add.circle(this.x, this.y, 24, 0x5bb4ff, 0.3);
+        this.shieldSprite.setStrokeStyle(2, 0x5bb4ff);
         this.shieldSprite.setDepth(9);
       }
       this.shieldSprite.setPosition(this.x, this.y);
@@ -226,7 +302,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.health <= 0) {
       this.health = 0;
       this.setActive(false);
-      this.setVisible(false);
+      this.legSprite.setVisible(false);
+      this.torsoSprite.setVisible(false);
+      this.legShadow.setVisible(false);
+      this.torsoShadow.setVisible(false);
     }
   }
 
