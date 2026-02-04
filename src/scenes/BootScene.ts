@@ -97,6 +97,7 @@ export class BootScene extends Phaser.Scene {
 
   private async loadTexturesFromPaq(archive: PaqArchive) {
     const textureMap: Record<string, { path: string; frameWidth: number; frameHeight: number }> = {
+      // Game sprites
       'trooper_sheet': { path: 'game/trooper.jaz', frameWidth: 64, frameHeight: 64 },
       'zombie_sheet': { path: 'game/zombie.jaz', frameWidth: 64, frameHeight: 64 },
       'alien_sheet': { path: 'game/alien.jaz', frameWidth: 64, frameHeight: 64 },
@@ -110,6 +111,41 @@ export class BootScene extends Phaser.Scene {
       'muzzle_flash_img': { path: 'game/muzzleflash.jaz', frameWidth: 0, frameHeight: 0 },
       'arrow': { path: 'game/arrow.jaz', frameWidth: 0, frameHeight: 0 },
       'terrain': { path: 'ter/ter_q1_base.jaz', frameWidth: 0, frameHeight: 0 },
+      // UI - HUD
+      'ui_gameTop': { path: 'ui/ui_gameTop.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_lifeHeart': { path: 'ui/ui_lifeHeart.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_indLife': { path: 'ui/ui_indLife.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_indPanel': { path: 'ui/ui_indPanel.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_indBullet': { path: 'ui/ui_indBullet.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_indFire': { path: 'ui/ui_indFire.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_indRocket': { path: 'ui/ui_indRocket.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_indElectric': { path: 'ui/ui_indElectric.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_wicons': { path: 'ui/ui_wicons.jaz', frameWidth: 32, frameHeight: 16 },
+      'ui_clockTable': { path: 'ui/ui_clockTable.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_clockPointer': { path: 'ui/ui_clockPointer.jaz', frameWidth: 0, frameHeight: 0 },
+      // UI - Menu
+      'ui_menuPanel': { path: 'ui/ui_menuPanel.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_menuItem': { path: 'ui/ui_menuItem.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_signCrimson': { path: 'ui/ui_signCrimson.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_cursor': { path: 'ui/ui_cursor.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_aim': { path: 'ui/ui_aim.jaz', frameWidth: 0, frameHeight: 0 },
+      // UI - Buttons
+      'ui_button_145x32': { path: 'ui/ui_button_145x32.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_button_128x32': { path: 'ui/ui_button_128x32.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_button_82x32': { path: 'ui/ui_button_82x32.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_button_64x32': { path: 'ui/ui_button_64x32.jaz', frameWidth: 0, frameHeight: 0 },
+      // UI - Perk selection
+      'ui_textLevelUp': { path: 'ui/ui_textLevelUp.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_textPickAPerk': { path: 'ui/ui_textPickAPerk.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_num1': { path: 'ui/ui_num1.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_num2': { path: 'ui/ui_num2.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_num3': { path: 'ui/ui_num3.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_num4': { path: 'ui/ui_num4.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_num5': { path: 'ui/ui_num5.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_itemTexts': { path: 'ui/ui_itemTexts.jaz', frameWidth: 0, frameHeight: 0 },
+      // UI - Game over / Results
+      'ui_textWellDone': { path: 'ui/ui_textWellDone.jaz', frameWidth: 0, frameHeight: 0 },
+      'ui_textReaper': { path: 'ui/ui_textReaper.jaz', frameWidth: 0, frameHeight: 0 },
     };
 
     const entries = Object.entries(textureMap);
