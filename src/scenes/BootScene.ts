@@ -1,119 +1,134 @@
 import Phaser from 'phaser';
+import { PaqArchive, decodeJaz, jazToCanvas, isJazFile } from '../loaders/PaqLoader';
+
+const PAQ_URL = 'https://paq.crimson.banteg.xyz/v1.9.93/crimson.paq';
 
 export class BootScene extends Phaser.Scene {
+  private loadingText!: Phaser.GameObjects.Text;
+
   constructor() {
     super('BootScene');
   }
 
   preload() {
-    this.load.spritesheet('trooper_sheet', '/assets/game/trooper.png', { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('zombie_sheet', '/assets/game/zombie.png', { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('alien_sheet', '/assets/game/alien.png', { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('lizard_sheet', '/assets/game/lizard.png', { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('spider_sp1_sheet', '/assets/game/spider_sp1.png', { frameWidth: 64, frameHeight: 64 });
-    this.load.spritesheet('spider_sp2_sheet', '/assets/game/spider_sp2.png', { frameWidth: 64, frameHeight: 64 });
+    const { width, height } = this.cameras.main;
+    this.loadingText = this.add.text(width / 2, height / 2, 'Loading...', {
+      fontSize: '24px',
+      color: '#ffffff'
+    }).setOrigin(0.5);
+  }
 
-    this.load.spritesheet('projs_sheet', '/assets/game/projs.png', { frameWidth: 16, frameHeight: 16 });
-    this.load.spritesheet('bonuses_sheet', '/assets/game/bonuses.png', { frameWidth: 32, frameHeight: 32 });
-    this.load.spritesheet('particles_sheet', '/assets/game/particles.png', { frameWidth: 32, frameHeight: 32 });
-    this.load.spritesheet('bodyset_sheet', '/assets/game/bodyset.png', { frameWidth: 64, frameHeight: 64 });
-    this.load.image('muzzle_flash_img', '/assets/game/muzzleFlash.png');
-    this.load.image('arrow', '/assets/game/arrow.png');
-    this.load.image('terrain', '/assets/game/crimson/ter/ter_q1_base.png');
+  async create() {
+    try {
+      this.loadingText.setText('Fetching assets...');
+      const archive = await PaqArchive.fromUrl(PAQ_URL);
 
-    this.load.on('loaderror', (file: Phaser.Loader.File) => {
-      console.warn(`Failed to load: ${file.key} from ${file.url}`);
+      this.loadingText.setText('Decoding textures...');
+      await this.loadTexturesFromPaq(archive);
+
+      this.createAnimations();
+      this.generateFallbackTextures();
+      this.scene.start('MenuScene');
+    } catch (error) {
+      console.error('Failed to load assets:', error);
+      this.loadingText.setText('Failed to load assets. Check console.');
+    }
+  }
+
+  private async loadTexturesFromPaq(archive: PaqArchive) {
+    const textureMap: Record<string, { path: string; frameWidth: number; frameHeight: number }> = {
+      'trooper_sheet': { path: 'game/trooper.jaz', frameWidth: 64, frameHeight: 64 },
+      'zombie_sheet': { path: 'game/zombie.jaz', frameWidth: 64, frameHeight: 64 },
+      'alien_sheet': { path: 'game/alien.jaz', frameWidth: 64, frameHeight: 64 },
+      'lizard_sheet': { path: 'game/lizard.jaz', frameWidth: 64, frameHeight: 64 },
+      'spider_sp1_sheet': { path: 'game/spider_sp1.jaz', frameWidth: 64, frameHeight: 64 },
+      'spider_sp2_sheet': { path: 'game/spider_sp2.jaz', frameWidth: 64, frameHeight: 64 },
+      'projs_sheet': { path: 'game/projs.jaz', frameWidth: 16, frameHeight: 16 },
+      'bonuses_sheet': { path: 'game/bonuses.jaz', frameWidth: 32, frameHeight: 32 },
+      'particles_sheet': { path: 'game/particles.jaz', frameWidth: 32, frameHeight: 32 },
+      'bodyset_sheet': { path: 'game/bodyset.jaz', frameWidth: 64, frameHeight: 64 },
+      'muzzle_flash_img': { path: 'game/muzzleflash.jaz', frameWidth: 0, frameHeight: 0 },
+      'arrow': { path: 'game/arrow.jaz', frameWidth: 0, frameHeight: 0 },
+      'terrain': { path: 'ter/ter_q1_base.jaz', frameWidth: 0, frameHeight: 0 },
+    };
+
+    const total = Object.keys(textureMap).length;
+    let loaded = 0;
+
+    for (const [key, config] of Object.entries(textureMap)) {
+      const data = archive.get(config.path);
+      if (!data) {
+        console.warn(`Missing asset in PAQ: ${config.path}`);
+        continue;
+      }
+
+      try {
+        const jazImage = await decodeJaz(data);
+        const canvas = jazToCanvas(jazImage);
+
+        if (config.frameWidth > 0 && config.frameHeight > 0) {
+          const img = await this.canvasToImage(canvas);
+          this.textures.addSpriteSheet(key, img, {
+            frameWidth: config.frameWidth,
+            frameHeight: config.frameHeight
+          });
+        } else {
+          this.textures.addCanvas(key, canvas);
+        }
+
+        loaded++;
+        this.loadingText.setText(`Loading textures... ${loaded}/${total}`);
+      } catch (err) {
+        console.warn(`Failed to decode ${config.path}:`, err);
+      }
+    }
+
+    await this.createAliasTextures();
+  }
+
+  private canvasToImage(canvas: HTMLCanvasElement): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = canvas.toDataURL('image/png');
     });
   }
 
-  create() {
-    this.textures.addSpriteSheet('player', this.textures.get('trooper_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 64,
-      frameHeight: 64
-    });
+  private async createAliasTextures() {
+    const aliases: Record<string, { source: string; frameWidth: number; frameHeight: number }> = {
+      'player': { source: 'trooper_sheet', frameWidth: 64, frameHeight: 64 },
+      'zombie': { source: 'zombie_sheet', frameWidth: 64, frameHeight: 64 },
+      'fast_zombie': { source: 'zombie_sheet', frameWidth: 64, frameHeight: 64 },
+      'big_zombie': { source: 'zombie_sheet', frameWidth: 64, frameHeight: 64 },
+      'spider': { source: 'spider_sp1_sheet', frameWidth: 64, frameHeight: 64 },
+      'baby_spider': { source: 'spider_sp1_sheet', frameWidth: 64, frameHeight: 64 },
+      'spider_mother': { source: 'spider_sp2_sheet', frameWidth: 64, frameHeight: 64 },
+      'alien': { source: 'alien_sheet', frameWidth: 64, frameHeight: 64 },
+      'alien_elite': { source: 'alien_sheet', frameWidth: 64, frameHeight: 64 },
+      'alien_boss': { source: 'alien_sheet', frameWidth: 64, frameHeight: 64 },
+      'lizard': { source: 'lizard_sheet', frameWidth: 64, frameHeight: 64 },
+      'lizard_spitter': { source: 'lizard_sheet', frameWidth: 64, frameHeight: 64 },
+      'boss': { source: 'zombie_sheet', frameWidth: 64, frameHeight: 64 },
+      'bullet': { source: 'projs_sheet', frameWidth: 16, frameHeight: 16 },
+      'plasma': { source: 'projs_sheet', frameWidth: 16, frameHeight: 16 },
+      'flame': { source: 'projs_sheet', frameWidth: 16, frameHeight: 16 },
+      'rocket': { source: 'projs_sheet', frameWidth: 16, frameHeight: 16 },
+      'bonus_health': { source: 'bonuses_sheet', frameWidth: 32, frameHeight: 32 },
+      'bonus_weapon': { source: 'bonuses_sheet', frameWidth: 32, frameHeight: 32 },
+    };
 
-    this.textures.addSpriteSheet('zombie', this.textures.get('zombie_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 64,
-      frameHeight: 64
-    });
-    this.textures.addSpriteSheet('fast_zombie', this.textures.get('zombie_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 64,
-      frameHeight: 64
-    });
-    this.textures.addSpriteSheet('big_zombie', this.textures.get('zombie_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 64,
-      frameHeight: 64
-    });
+    for (const [key, config] of Object.entries(aliases)) {
+      if (!this.textures.exists(config.source)) continue;
 
-    this.textures.addSpriteSheet('spider', this.textures.get('spider_sp1_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 64,
-      frameHeight: 64
-    });
-    this.textures.addSpriteSheet('baby_spider', this.textures.get('spider_sp1_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 64,
-      frameHeight: 64
-    });
-    this.textures.addSpriteSheet('spider_mother', this.textures.get('spider_sp2_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 64,
-      frameHeight: 64
-    });
+      const sourceTexture = this.textures.get(config.source);
+      const sourceImage = sourceTexture.getSourceImage() as HTMLImageElement;
 
-    this.textures.addSpriteSheet('alien', this.textures.get('alien_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 64,
-      frameHeight: 64
-    });
-    this.textures.addSpriteSheet('alien_elite', this.textures.get('alien_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 64,
-      frameHeight: 64
-    });
-    this.textures.addSpriteSheet('alien_boss', this.textures.get('alien_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 64,
-      frameHeight: 64
-    });
-
-    this.textures.addSpriteSheet('lizard', this.textures.get('lizard_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 64,
-      frameHeight: 64
-    });
-    this.textures.addSpriteSheet('lizard_spitter', this.textures.get('lizard_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 64,
-      frameHeight: 64
-    });
-
-    this.textures.addSpriteSheet('boss', this.textures.get('zombie_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 64,
-      frameHeight: 64
-    });
-
-    this.textures.addSpriteSheet('bullet', this.textures.get('projs_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 16,
-      frameHeight: 16
-    });
-    this.textures.addSpriteSheet('plasma', this.textures.get('projs_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 16,
-      frameHeight: 16
-    });
-    this.textures.addSpriteSheet('flame', this.textures.get('projs_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 16,
-      frameHeight: 16
-    });
-    this.textures.addSpriteSheet('rocket', this.textures.get('projs_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 16,
-      frameHeight: 16
-    });
-
-    this.textures.addSpriteSheet('bonus_health', this.textures.get('bonuses_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 32,
-      frameHeight: 32
-    });
-    this.textures.addSpriteSheet('bonus_weapon', this.textures.get('bonuses_sheet').getSourceImage() as HTMLImageElement, {
-      frameWidth: 32,
-      frameHeight: 32
-    });
-
-    this.createAnimations();
-    this.generateFallbackTextures();
-    this.scene.start('MenuScene');
+      this.textures.addSpriteSheet(key, sourceImage, {
+        frameWidth: config.frameWidth,
+        frameHeight: config.frameHeight
+      });
+    }
   }
 
   private createAnimations() {
