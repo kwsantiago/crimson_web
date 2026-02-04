@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { PaqArchive, decodeJaz, jazToCanvas } from '../loaders/PaqLoader';
 
-const PAQ_URL = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://paq.crimson.banteg.xyz/v1.9.93/crimson.paq');
+const PAQ_URL = './crimson.paq';
 const CACHE_KEY = 'crimson_paq_v1';
 
 export class BootScene extends Phaser.Scene {
