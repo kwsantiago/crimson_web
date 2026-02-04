@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
-import { PaqArchive, decodeJaz, jazToCanvas, isJazFile } from '../loaders/PaqLoader';
+import { PaqArchive, decodeJaz, jazToCanvas } from '../loaders/PaqLoader';
 
 const PAQ_URL = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://paq.crimson.banteg.xyz/v1.9.93/crimson.paq');
+const CACHE_KEY = 'crimson_paq_v1';
 
 export class BootScene extends Phaser.Scene {
   private loadingText!: Phaser.GameObjects.Text;
@@ -20,8 +21,10 @@ export class BootScene extends Phaser.Scene {
 
   async create() {
     try {
-      this.loadingText.setText('Fetching assets...');
-      const archive = await PaqArchive.fromUrl(PAQ_URL);
+      const buffer = await this.fetchWithCache();
+
+      this.loadingText.setText('Parsing archive...');
+      const archive = PaqArchive.fromArrayBuffer(buffer);
 
       this.loadingText.setText('Decoding textures...');
       await this.loadTexturesFromPaq(archive);
@@ -33,6 +36,63 @@ export class BootScene extends Phaser.Scene {
       console.error('Failed to load assets:', error);
       this.loadingText.setText('Failed to load assets. Check console.');
     }
+  }
+
+  private async fetchWithCache(): Promise<ArrayBuffer> {
+    const cached = await this.getFromCache();
+    if (cached) {
+      this.loadingText.setText('Loaded from cache!');
+      return cached;
+    }
+
+    this.loadingText.setText('Fetching assets...');
+    const response = await fetch(PAQ_URL);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PAQ: ${response.statusText}`);
+    }
+    const buffer = await response.arrayBuffer();
+
+    this.saveToCache(buffer);
+    return buffer;
+  }
+
+  private async getFromCache(): Promise<ArrayBuffer | null> {
+    return new Promise((resolve) => {
+      const request = indexedDB.open('CrimsonCache', 1);
+      request.onerror = () => resolve(null);
+      request.onupgradeneeded = (e) => {
+        const db = (e.target as IDBOpenDBRequest).result;
+        if (!db.objectStoreNames.contains('assets')) {
+          db.createObjectStore('assets');
+        }
+      };
+      request.onsuccess = (e) => {
+        const db = (e.target as IDBOpenDBRequest).result;
+        try {
+          const tx = db.transaction('assets', 'readonly');
+          const store = tx.objectStore('assets');
+          const get = store.get(CACHE_KEY);
+          get.onsuccess = () => resolve(get.result || null);
+          get.onerror = () => resolve(null);
+        } catch {
+          resolve(null);
+        }
+      };
+    });
+  }
+
+  private saveToCache(buffer: ArrayBuffer): void {
+    const request = indexedDB.open('CrimsonCache', 1);
+    request.onsuccess = (e) => {
+      const db = (e.target as IDBOpenDBRequest).result;
+      try {
+        const tx = db.transaction('assets', 'readwrite');
+        const store = tx.objectStore('assets');
+        store.put(buffer, CACHE_KEY);
+      } catch (err) {
+        console.warn('Failed to cache PAQ:', err);
+      }
+    };
   }
 
   private async loadTexturesFromPaq(archive: PaqArchive) {
@@ -52,37 +112,48 @@ export class BootScene extends Phaser.Scene {
       'terrain': { path: 'ter/ter_q1_base.jaz', frameWidth: 0, frameHeight: 0 },
     };
 
-    const total = Object.keys(textureMap).length;
-    let loaded = 0;
+    const entries = Object.entries(textureMap);
+    const total = entries.length;
 
-    for (const [key, config] of Object.entries(textureMap)) {
+    // Decode all textures in parallel
+    const decodePromises = entries.map(async ([key, config]) => {
       const data = archive.get(config.path);
       if (!data) {
         console.warn(`Missing asset in PAQ: ${config.path}`);
-        continue;
+        return null;
       }
-
       try {
         const jazImage = await decodeJaz(data);
         const canvas = jazToCanvas(jazImage);
-
-        if (config.frameWidth > 0 && config.frameHeight > 0) {
-          const img = await this.canvasToImage(canvas);
-          this.textures.addSpriteSheet(key, img, {
-            frameWidth: config.frameWidth,
-            frameHeight: config.frameHeight
-          });
-        } else {
-          this.textures.addCanvas(key, canvas);
-        }
-
-        loaded++;
-        this.loadingText.setText(`Loading textures... ${loaded}/${total}`);
+        return { key, config, canvas };
       } catch (err) {
         console.warn(`Failed to decode ${config.path}:`, err);
+        return null;
       }
+    });
+
+    this.loadingText.setText(`Decoding ${total} textures...`);
+    const results = await Promise.all(decodePromises);
+
+    // Register textures (must be sequential for Phaser)
+    let loaded = 0;
+    for (const result of results) {
+      if (!result) continue;
+      const { key, config, canvas } = result;
+
+      if (config.frameWidth > 0 && config.frameHeight > 0) {
+        const img = await this.canvasToImage(canvas);
+        this.textures.addSpriteSheet(key, img, {
+          frameWidth: config.frameWidth,
+          frameHeight: config.frameHeight
+        });
+      } else {
+        this.textures.addCanvas(key, canvas);
+      }
+      loaded++;
     }
 
+    this.loadingText.setText(`Loaded ${loaded} textures`);
     await this.createAliasTextures();
   }
 
