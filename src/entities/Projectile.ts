@@ -14,6 +14,17 @@ const PROJ_FRAMES: Record<ProjectileType, number> = {
   [ProjectileType.PULSE]: 0,
   [ProjectileType.SHRINK]: 2,
   [ProjectileType.SPLITTER]: 3,
+  [ProjectileType.SEEKER]: 8,
+  [ProjectileType.SPIDER]: 13,
+  [ProjectileType.SCYTHE]: 6,
+  [ProjectileType.RAY]: 2,
+  [ProjectileType.PLAGUE]: 13,
+  [ProjectileType.BUBBLE]: 0,
+  [ProjectileType.RAINBOW]: 13,
+  [ProjectileType.GRIM]: 6,
+  [ProjectileType.TRANSMUTE]: 13,
+  [ProjectileType.BLASTER]: 13,
+  [ProjectileType.LIGHTNING]: 2,
 };
 
 const BULLET_TRAIL_TYPES = new Set([
@@ -24,22 +35,24 @@ const BULLET_TRAIL_TYPES = new Set([
 const PLASMA_PARTICLE_TYPES = new Set([
   ProjectileType.PLASMA,
   ProjectileType.SHRINK,
+  ProjectileType.SPIDER,
 ]);
 
 const BEAM_TYPES = new Set([
   ProjectileType.ION,
-  ProjectileType.FLAME,
+  ProjectileType.LIGHTNING,
 ]);
 
 const ROCKET_TYPES = new Set([
   ProjectileType.ROCKET,
   ProjectileType.NUKE,
+  ProjectileType.SEEKER,
 ]);
 
 const PROJ_COLORS: Record<ProjectileType, { trail: number; head: number; rgb: [number, number, number] }> = {
-  [ProjectileType.BULLET]: { trail: 0xdcdca0, head: 0xdcdca0, rgb: [0.94, 0.86, 0.63] },
+  [ProjectileType.BULLET]: { trail: 0xf0dca0, head: 0xf0dca0, rgb: [0.94, 0.86, 0.63] },
   [ProjectileType.PLASMA]: { trail: 0xffffff, head: 0xffffff, rgb: [1.0, 1.0, 1.0] },
-  [ProjectileType.GAUSS]: { trail: 0x78c8ff, head: 0x78c8ff, rgb: [0.47, 0.78, 1.0] },
+  [ProjectileType.GAUSS]: { trail: 0x3380ff, head: 0x3380ff, rgb: [0.2, 0.5, 1.0] },
   [ProjectileType.FLAME]: { trail: 0xffaa5a, head: 0xffffff, rgb: [1.0, 0.67, 0.35] },
   [ProjectileType.ROCKET]: { trail: 0xff6600, head: 0xffcc44, rgb: [1.0, 0.4, 0.0] },
   [ProjectileType.NUKE]: { trail: 0xff4400, head: 0xffff44, rgb: [1.0, 0.27, 0.0] },
@@ -48,6 +61,17 @@ const PROJ_COLORS: Record<ProjectileType, { trail: number; head: number; rgb: [n
   [ProjectileType.PULSE]: { trail: 0x1a9933, head: 0x1a9933, rgb: [0.1, 0.6, 0.2] },
   [ProjectileType.SHRINK]: { trail: 0x4d4dff, head: 0xa0ffaa, rgb: [0.3, 0.3, 1.0] },
   [ProjectileType.SPLITTER]: { trail: 0xffaa44, head: 0xffe699, rgb: [1.0, 0.9, 0.1] },
+  [ProjectileType.SEEKER]: { trail: 0xff6600, head: 0xffcc44, rgb: [1.0, 0.4, 0.0] },
+  [ProjectileType.SPIDER]: { trail: 0x00ff66, head: 0x88ffaa, rgb: [0.0, 1.0, 0.4] },
+  [ProjectileType.SCYTHE]: { trail: 0x880088, head: 0xcc44cc, rgb: [0.53, 0.0, 0.53] },
+  [ProjectileType.RAY]: { trail: 0x00ffff, head: 0x88ffff, rgb: [0.0, 1.0, 1.0] },
+  [ProjectileType.PLAGUE]: { trail: 0x44aa44, head: 0x88cc88, rgb: [0.27, 0.67, 0.27] },
+  [ProjectileType.BUBBLE]: { trail: 0x88ccff, head: 0xaaddff, rgb: [0.53, 0.8, 1.0] },
+  [ProjectileType.RAINBOW]: { trail: 0xff88ff, head: 0xffaaff, rgb: [1.0, 0.53, 1.0] },
+  [ProjectileType.GRIM]: { trail: 0x444444, head: 0x888888, rgb: [0.27, 0.27, 0.27] },
+  [ProjectileType.TRANSMUTE]: { trail: 0xffcc00, head: 0xffee44, rgb: [1.0, 0.8, 0.0] },
+  [ProjectileType.BLASTER]: { trail: 0xff4444, head: 0xff8888, rgb: [1.0, 0.27, 0.27] },
+  [ProjectileType.LIGHTNING]: { trail: 0xffffaa, head: 0xffffff, rgb: [1.0, 1.0, 0.67] },
 };
 
 const BEAM_SCALES: Record<ProjectileType, number> = {
@@ -62,6 +86,17 @@ const BEAM_SCALES: Record<ProjectileType, number> = {
   [ProjectileType.PULSE]: 0.8,
   [ProjectileType.SHRINK]: 0.8,
   [ProjectileType.SPLITTER]: 0.8,
+  [ProjectileType.SEEKER]: 0.8,
+  [ProjectileType.SPIDER]: 0.8,
+  [ProjectileType.SCYTHE]: 1.2,
+  [ProjectileType.RAY]: 1.5,
+  [ProjectileType.PLAGUE]: 0.8,
+  [ProjectileType.BUBBLE]: 0.8,
+  [ProjectileType.RAINBOW]: 0.8,
+  [ProjectileType.GRIM]: 1.0,
+  [ProjectileType.TRANSMUTE]: 0.8,
+  [ProjectileType.BLASTER]: 0.8,
+  [ProjectileType.LIGHTNING]: 3.0,
 };
 
 export class Projectile extends Phaser.Physics.Arcade.Sprite {
@@ -112,9 +147,11 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     this.startY = y;
     this.lifespan = 0;
 
-    this.penetrating = type === ProjectileType.FLAME || type === ProjectileType.GAUSS;
+    this.penetrating = type === ProjectileType.FLAME || type === ProjectileType.GAUSS ||
+                       type === ProjectileType.LIGHTNING || type === ProjectileType.BLADE;
 
-    if (type === ProjectileType.ROCKET || type === ProjectileType.NUKE) {
+    if (type === ProjectileType.ROCKET || type === ProjectileType.NUKE ||
+        type === ProjectileType.SEEKER) {
       this.isExplosive = true;
       this.explosionRadius = type === ProjectileType.NUKE ? 200 : 80;
     }
@@ -130,6 +167,13 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
         this.maxLifespan = 4000;
         break;
       case ProjectileType.ROCKET:
+      case ProjectileType.SEEKER:
+        this.maxLifespan = 3000;
+        break;
+      case ProjectileType.LIGHTNING:
+        this.maxLifespan = 1500;
+        break;
+      case ProjectileType.BUBBLE:
         this.maxLifespan = 3000;
         break;
       default:
@@ -336,7 +380,7 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     const step = Math.min(effectScale * 3.1, 9.0);
     const lineWidth = effectScale * 3;
 
-    const streakColor = isFireBullets ? 0xffaa5a : 0x80ccff;
+    const streakColor = isFireBullets ? 0xff991a : 0x8099ff;
 
     for (let s = start; s < dist; s += step) {
       const t = span > 0 ? (s - start) / span : 1.0;

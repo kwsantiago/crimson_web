@@ -8,10 +8,12 @@ export class BonusManager {
   private scene: Phaser.Scene;
   private bonuses: Phaser.Physics.Arcade.Group;
   private player: Player;
-  private baseSpawnChance: number = 0.10;
 
   private onNuke?: () => void;
   private onFreeze?: (duration: number) => void;
+  private onShockChain?: () => void;
+  private onFireblast?: () => void;
+  private onEnergizer?: (duration: number) => void;
 
   constructor(
     scene: Phaser.Scene,
@@ -26,15 +28,23 @@ export class BonusManager {
   setCallbacks(callbacks: {
     onNuke?: () => void;
     onFreeze?: (duration: number) => void;
+    onShockChain?: () => void;
+    onFireblast?: () => void;
+    onEnergizer?: (duration: number) => void;
   }) {
     this.onNuke = callbacks.onNuke;
     this.onFreeze = callbacks.onFreeze;
+    this.onShockChain = callbacks.onShockChain;
+    this.onFireblast = callbacks.onFireblast;
+    this.onEnergizer = callbacks.onEnergizer;
   }
 
   trySpawnBonus(x: number, y: number) {
-    let chance = this.baseSpawnChance;
-
-    if (Math.random() > chance) return;
+    const baseRoll = Math.floor(Math.random() * 9);
+    if (baseRoll !== 1) {
+      if (!this.player.perkManager.hasBonusMagnet()) return;
+      if (Math.floor(Math.random() * 10) !== 2) return;
+    }
 
     const type = pickRandomBonusType();
     this.spawnBonus(x, y, type);
@@ -42,6 +52,11 @@ export class BonusManager {
 
   spawnBonus(x: number, y: number, type: BonusType) {
     const bonus = new Bonus(this.scene, x, y, type);
+    this.bonuses.add(bonus);
+  }
+
+  spawnBonusAt(x: number, y: number, type: BonusType, weaponId?: number) {
+    const bonus = new Bonus(this.scene, x, y, type, weaponId);
     this.bonuses.add(bonus);
   }
 
@@ -62,12 +77,9 @@ export class BonusManager {
     const data = getBonusData(bonus.bonusType);
 
     switch (bonus.bonusType) {
-      case BonusType.XP_SMALL:
-      case BonusType.XP_MEDIUM:
-      case BonusType.XP_LARGE:
-        if (data.xpValue) {
-          this.player.addXp(data.xpValue);
-        }
+      case BonusType.POINTS:
+        const xpValue = (Math.floor(Math.random() * 8) < 3) ? 1000 : 500;
+        this.player.addXp(xpValue);
         break;
 
       case BonusType.MEDIKIT:
@@ -77,12 +89,16 @@ export class BonusManager {
         break;
 
       case BonusType.WEAPON:
-        const currentIndex = this.player.weaponManager.currentWeaponIndex;
-        let newIndex: number;
-        do {
-          newIndex = Math.floor(Math.random() * WEAPONS.length);
-        } while (newIndex === currentIndex && WEAPONS.length > 1);
-        this.player.weaponManager.switchWeapon(newIndex);
+        if (bonus.weaponId !== undefined) {
+          this.player.weaponManager.switchWeapon(bonus.weaponId);
+        } else {
+          const currentIndex = this.player.weaponManager.currentWeaponIndex;
+          let newIndex: number;
+          do {
+            newIndex = Math.floor(Math.random() * WEAPONS.length);
+          } while (newIndex === currentIndex && WEAPONS.length > 1);
+          this.player.weaponManager.switchWeapon(newIndex);
+        }
         break;
 
       case BonusType.SPEED:
@@ -103,6 +119,31 @@ export class BonusManager {
 
       case BonusType.NUKE:
         this.onNuke?.();
+        break;
+
+      case BonusType.DOUBLE_EXPERIENCE:
+        this.player.activateDoubleXp(data.duration);
+        break;
+
+      case BonusType.WEAPON_POWER_UP:
+        this.player.activateWeaponPowerUp(data.duration);
+        break;
+
+      case BonusType.SHOCK_CHAIN:
+        this.onShockChain?.();
+        break;
+
+      case BonusType.FIREBLAST:
+        this.onFireblast?.();
+        break;
+
+      case BonusType.FIRE_BULLETS:
+        this.player.activateFireBullets(data.duration);
+        break;
+
+      case BonusType.ENERGIZER:
+        this.player.activateEnergizer(data.duration);
+        this.onEnergizer?.(data.duration);
         break;
     }
 

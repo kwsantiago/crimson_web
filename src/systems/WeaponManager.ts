@@ -3,39 +3,40 @@ import { WEAPONS, WeaponData, getWeaponByIndex, ProjectileType } from '../data/w
 import { Projectile } from '../entities/Projectile';
 import { PerkManager } from './PerkManager';
 
+export interface BonusTimers {
+  weaponPowerUpTimer: number;
+  fireBulletsTimer: number;
+  healthPercent: number;
+}
+
+export interface WeaponSoundCallbacks {
+  onFire?: (weaponIndex: number) => void;
+  onReload?: (weaponIndex: number) => void;
+}
+
 export class WeaponManager {
   private scene: Phaser.Scene;
   private projectiles: Phaser.Physics.Arcade.Group;
   private perkManager?: PerkManager;
+  private bonusTimers?: () => BonusTimers;
+  private soundCallbacks?: WeaponSoundCallbacks;
   private _currentWeaponIndex: number = 1;
   private ammo: number;
   private reloadTimer: number = 0;
   private shotCooldown: number = 0;
   private isReloading: boolean = false;
 
-  private reloadKey: Phaser.Input.Keyboard.Key;
-  private numberKeys: Phaser.Input.Keyboard.Key[];
+  private middleButtonWasDown: boolean = false;
 
   constructor(scene: Phaser.Scene, projectiles: Phaser.Physics.Arcade.Group, perkManager?: PerkManager) {
     this.scene = scene;
     this.projectiles = projectiles;
     this.perkManager = perkManager;
     this.ammo = this.clipSize;
+  }
 
-    const keyboard = scene.input.keyboard!;
-    this.reloadKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
-    this.numberKeys = [
-      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
-      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
-      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
-      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR),
-      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE),
-      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SIX),
-      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SEVEN),
-      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.EIGHT),
-      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NINE),
-      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ZERO)
-    ];
+  setSoundCallbacks(callbacks: WeaponSoundCallbacks) {
+    this.soundCallbacks = callbacks;
   }
 
   get currentWeapon(): WeaponData {
@@ -68,53 +69,72 @@ export class WeaponManager {
 
   private getReloadTime(): number {
     const base = this.currentWeapon.reloadTime;
-    const multiplier = this.perkManager?.getReloadMultiplier() ?? 1.0;
+    let multiplier = this.perkManager?.getReloadMultiplier() ?? 1.0;
+    if (this.hasWeaponPowerUp()) {
+      multiplier *= 0.5;
+    }
     return base * multiplier;
   }
 
   private getFireRate(): number {
     const base = this.currentWeapon.fireRate;
-    const multiplier = this.perkManager?.getFireRateMultiplier() ?? 1.0;
+    let multiplier = this.perkManager?.getFireRateMultiplier() ?? 1.0;
+    if (this.perkManager?.hasSharpshooter()) {
+      multiplier *= this.perkManager.getSharpshooterFireRateMultiplier();
+    }
+    if (this.hasWeaponPowerUp()) {
+      multiplier *= 0.5;
+    }
     return base * multiplier;
   }
 
   private getSpread(): number {
-    const base = this.currentWeapon.spread;
-    const multiplier = this.perkManager?.getSpreadMultiplier() ?? 1.0;
-    return base * multiplier;
+    if (this.perkManager?.hasSharpshooter()) {
+      return this.perkManager.getSharpshooterSpreadHeat();
+    }
+    return this.currentWeapon.spread;
   }
 
   private getDamage(): number {
     const base = this.currentWeapon.damage;
-    const multiplier = this.perkManager?.getDamageMultiplier(this.currentWeapon.projectileType) ?? 1.0;
+    let multiplier = this.perkManager?.getDamageMultiplier(this.currentWeapon.projectileType) ?? 1.0;
+    multiplier *= this.perkManager?.getLivingFortressDamageMultiplier() ?? 1.0;
+    const healthPercent = this.bonusTimers ? this.bonusTimers().healthPercent : 1.0;
+    multiplier *= this.perkManager?.getHotTemperedMultiplier(healthPercent) ?? 1.0;
     return Math.floor(base * multiplier);
   }
 
-  update(delta: number) {
+  update(delta: number, isMoving: boolean = false, isFiring: boolean = false) {
     const dt = delta / 1000;
 
     this.shotCooldown = Math.max(0, this.shotCooldown - dt);
 
     if (this.isReloading) {
-      this.reloadTimer -= dt;
+      let reloadMultiplier = 1.0;
+      if (!isMoving && this.perkManager?.hasStationaryReloader()) {
+        reloadMultiplier = 3.0;
+      }
+      this.reloadTimer -= dt * reloadMultiplier;
       if (this.reloadTimer <= 0) {
         this.finishReload();
       }
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.reloadKey) && !this.isReloading) {
+    const pointer = this.scene.input.activePointer;
+    const middleDown = pointer.middleButtonDown();
+    const middleJustPressed = middleDown && !this.middleButtonWasDown;
+    this.middleButtonWasDown = middleDown;
+
+    if (middleJustPressed && !this.isReloading) {
       if (this.ammo < this.clipSize) {
         this.startReload();
       }
     }
+  }
 
-    for (let i = 0; i < this.numberKeys.length; i++) {
-      if (Phaser.Input.Keyboard.JustDown(this.numberKeys[i])) {
-        const weaponIndex = i === 9 ? 0 : i + 1;
-        if (weaponIndex < WEAPONS.length) {
-          this.switchWeapon(weaponIndex);
-        }
-      }
+  triggerAutoReload() {
+    if (!this.isReloading && this.ammo < this.clipSize) {
+      this.startReload();
     }
   }
 
@@ -137,6 +157,8 @@ export class WeaponManager {
     const spread = this.getSpread();
     const damage = this.getDamage();
     const hasPoisonBullets = this.perkManager?.hasPoisonBullets() ?? false;
+    const useFireBullets = this.hasFireBullets();
+    const projectileType = useFireBullets ? ProjectileType.FLAME : weapon.projectileType;
 
     for (let i = 0; i < weapon.pelletCount; i++) {
       let spreadAngle = angle;
@@ -144,7 +166,7 @@ export class WeaponManager {
 
       const bullet = this.projectiles.get(x, y, 'bullet') as Projectile;
       if (bullet) {
-        bullet.fire(x, y, spreadAngle, weapon.projectileSpeed, damage, weapon.projectileType);
+        bullet.fire(x, y, spreadAngle, weapon.projectileSpeed, damage, projectileType);
         if (hasPoisonBullets) {
           bullet.isPoisoned = true;
         }
@@ -156,6 +178,7 @@ export class WeaponManager {
     }
     this.shotCooldown = this.getFireRate();
     emitMuzzleFlash();
+    this.soundCallbacks?.onFire?.(this._currentWeaponIndex);
 
     if (this.ammo <= 0 && !this.perkManager?.hasAmmunitionWithin()) {
       this.startReload();
@@ -168,6 +191,7 @@ export class WeaponManager {
     if (this.isReloading) return;
     this.isReloading = true;
     this.reloadTimer = this.getReloadTime();
+    this.soundCallbacks?.onReload?.(this._currentWeaponIndex);
   }
 
   private finishReload() {
@@ -191,5 +215,23 @@ export class WeaponManager {
 
   refundAmmo(count: number = 1) {
     this.ammo = Math.min(this.clipSize, this.ammo + count);
+  }
+
+  refillAmmo() {
+    this.ammo = this.clipSize;
+    this.isReloading = false;
+    this.reloadTimer = 0;
+  }
+
+  setBonusTimers(getter: () => BonusTimers) {
+    this.bonusTimers = getter;
+  }
+
+  private hasWeaponPowerUp(): boolean {
+    return this.bonusTimers ? this.bonusTimers().weaponPowerUpTimer > 0 : false;
+  }
+
+  private hasFireBullets(): boolean {
+    return this.bonusTimers ? this.bonusTimers().fireBulletsTimer > 0 : false;
   }
 }

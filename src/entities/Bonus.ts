@@ -3,12 +3,13 @@ import { BonusType, getBonusData } from '../data/bonuses';
 
 export class Bonus extends Phaser.Physics.Arcade.Sprite {
   bonusType: BonusType;
+  weaponId?: number;
   private lifespan: number = 0;
-  private maxLifespan: number = 15000;
+  private maxLifespan: number = 10000;
   private bobOffset: number = 0;
   private baseY: number;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, type: BonusType) {
+  constructor(scene: Phaser.Scene, x: number, y: number, type: BonusType, weaponId?: number) {
     const data = getBonusData(type);
     super(scene, x, y, data.sprite);
 
@@ -16,6 +17,7 @@ export class Bonus extends Phaser.Physics.Arcade.Sprite {
     scene.physics.add.existing(this);
 
     this.bonusType = type;
+    this.weaponId = weaponId;
     this.baseY = y;
     this.setCircle(10, 2, 2);
     this.setDepth(5);

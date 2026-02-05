@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { PerkId, getPerkData } from '../data/perks';
 import { PerkManager } from '../systems/PerkManager';
+import { SoundManager } from '../audio/SoundManager';
 import { SCREEN_WIDTH, SCREEN_HEIGHT, UI } from '../config';
 
 function easeOutCubic(t: number): number {
@@ -49,10 +50,12 @@ export class PerkSelector {
   private clickHandled: boolean = false;
   private descText!: Phaser.GameObjects.Text;
   private overlay!: Phaser.GameObjects.Rectangle;
+  private soundManager: SoundManager | null = null;
 
-  constructor(scene: Phaser.Scene, perkManager: PerkManager) {
+  constructor(scene: Phaser.Scene, perkManager: PerkManager, soundManager?: SoundManager) {
     this.scene = scene;
     this.perkManager = perkManager;
+    this.soundManager = soundManager ?? null;
     this.container = scene.add.container(0, 0);
     this.container.setDepth(1000);
     this.container.setScrollFactor(0);
@@ -148,6 +151,8 @@ export class PerkSelector {
     if (this.choices.length === 0) {
       return;
     }
+
+    this.soundManager?.playUiPanelClick();
 
     this.selectedIndex = 0;
     this.isVisible = true;
@@ -295,7 +300,11 @@ export class PerkSelector {
         this.numberSprites[i].setScale(this.perkScale * 0.6);
       }
 
-      const nameColor = isSelected ? '#ffffff' : '#46b4f0';
+      const alpha = isSelected ? UI.ALPHA.MENU_ITEM_HOVER : UI.ALPHA.MENU_ITEM_IDLE;
+      const r = (UI.COLORS.MENU_ITEM >> 16) & 0xff;
+      const g = (UI.COLORS.MENU_ITEM >> 8) & 0xff;
+      const b = UI.COLORS.MENU_ITEM & 0xff;
+      const nameColor = `rgba(${r}, ${g}, ${b}, ${alpha})`;
       const fontSize = Math.floor(14 * this.perkScale);
       const nameText = this.scene.add.text(listX, y, perk.name, {
         fontSize: `${fontSize}px`,
@@ -303,6 +312,15 @@ export class PerkSelector {
         fontFamily: 'Arial'
       }).setOrigin(0, 0).setScrollFactor(0).setDepth(1002);
       this.panelTexts.push(nameText);
+
+      const textWidth = nameText.width;
+      const lineY = y + 13 * this.perkScale;
+      const line = this.scene.add.graphics();
+      line.lineStyle(1, UI.COLORS.MENU_ITEM, alpha);
+      line.lineBetween(listX, lineY, listX + textWidth, lineY);
+      line.setScrollFactor(0);
+      line.setDepth(1002);
+      this.container.add(line);
 
       const stackCount = this.perkManager.getPerkCount(this.choices[i]);
       if (stackCount > 0) {
@@ -344,6 +362,8 @@ export class PerkSelector {
 
   private selectPerk(index: number) {
     if (index < 0 || index >= this.choices.length) return;
+
+    this.soundManager?.playPerkSelect();
 
     const perkId = this.choices[index];
     this.perkManager.applyPerk(perkId);

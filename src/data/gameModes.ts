@@ -1,6 +1,9 @@
 export enum GameMode {
   SURVIVAL = 'survival',
-  RUSH = 'rush'
+  RUSH = 'rush',
+  QUEST = 'quest',
+  TUTORIAL = 'tutorial',
+  TYPO = 'typo'
 }
 
 export interface GameModeConfig {
@@ -34,5 +37,35 @@ export const GAME_MODE_CONFIGS: Record<GameMode, GameModeConfig> = {
     xpMultiplier: 1.5,
     enemySpeedMultiplier: 1.3,
     waveCountMultiplier: 1.5
+  },
+  [GameMode.QUEST]: {
+    name: 'Quest',
+    description: 'Complete missions with specific objectives and unlock new content!',
+    baseSpawnInterval: 1.0,
+    minSpawnInterval: 0.5,
+    spawnDecayRate: 0.0,
+    xpMultiplier: 1.0,
+    enemySpeedMultiplier: 1.0,
+    waveCountMultiplier: 1.0
+  },
+  [GameMode.TUTORIAL]: {
+    name: 'Tutorial',
+    description: 'Learn the basics of Crimsonland',
+    baseSpawnInterval: 999,
+    minSpawnInterval: 999,
+    spawnDecayRate: 0,
+    xpMultiplier: 1.0,
+    enemySpeedMultiplier: 0.7,
+    waveCountMultiplier: 0
+  },
+  [GameMode.TYPO]: {
+    name: 'Typo Shooter',
+    description: 'Type enemy names to kill them!',
+    baseSpawnInterval: 3.5,
+    minSpawnInterval: 0.1,
+    spawnDecayRate: 0.0,
+    xpMultiplier: 1.0,
+    enemySpeedMultiplier: 0.5,
+    waveCountMultiplier: 1.0
   }
 };
