@@ -1,28 +1,78 @@
-import Phaser from 'phaser';
-import { Player } from '../entities/Player';
-import { Creature, CreatureConfig, clearCreaturePool } from '../entities/Creature';
-import { HighScoreManager } from '../systems/HighScoreManager';
-import { SoundManager } from '../audio/SoundManager';
-import { GameMode, GAME_MODE_CONFIGS } from '../data/gameModes';
-import { CreatureType } from '../data/creatures';
-import { TintRGBA, tintToHex } from '../systems/CreatureAI';
+import Phaser from "phaser";
+import { Player } from "../entities/Player";
+import {
+  Creature,
+  CreatureConfig,
+  clearCreaturePool,
+} from "../entities/Creature";
+import { HighScoreManager } from "../systems/HighScoreManager";
+import { SoundManager } from "../audio/SoundManager";
+import { GameMode, GAME_MODE_CONFIGS } from "../data/gameModes";
+import { CreatureType } from "../data/creatures";
+import { TintRGBA, tintToHex } from "../systems/CreatureAI";
 import {
   WORLD_WIDTH,
   WORLD_HEIGHT,
   SCREEN_WIDTH,
   SCREEN_HEIGHT,
-  UI
-} from '../config';
+  UI,
+} from "../config";
 
 const TYPING_MAX_CHARS = 17;
 
 const NAME_PARTS = [
-  'lamb', 'gun', 'head', 'tail', 'leg', 'nose', 'road', 'stab', 'high', 'low',
-  'hat', 'pie', 'hand', 'jack', 'cube', 'ice', 'cow', 'king', 'lord', 'mate',
-  'mary', 'dick', 'bill', 'cat', 'harry', 'tom', 'fly', 'call', 'shot', 'gate',
-  'quick', 'brown', 'fox', 'jumper', 'over', 'lazy', 'dog', 'zeta', 'unique',
-  'nerd', 'earl', 'sleep', 'onyx', 'mill', 'blue', 'below', 'scape', 'reap',
-  'damo', 'break', 'boom', 'the'
+  "lamb",
+  "gun",
+  "head",
+  "tail",
+  "leg",
+  "nose",
+  "road",
+  "stab",
+  "high",
+  "low",
+  "hat",
+  "pie",
+  "hand",
+  "jack",
+  "cube",
+  "ice",
+  "cow",
+  "king",
+  "lord",
+  "mate",
+  "mary",
+  "dick",
+  "bill",
+  "cat",
+  "harry",
+  "tom",
+  "fly",
+  "call",
+  "shot",
+  "gate",
+  "quick",
+  "brown",
+  "fox",
+  "jumper",
+  "over",
+  "lazy",
+  "dog",
+  "zeta",
+  "unique",
+  "nerd",
+  "earl",
+  "sleep",
+  "onyx",
+  "mill",
+  "blue",
+  "below",
+  "scape",
+  "reap",
+  "damo",
+  "break",
+  "boom",
+  "the",
 ];
 
 interface TypoCreature {
@@ -35,7 +85,7 @@ export class TypoScene extends Phaser.Scene {
   private creatures!: Phaser.Physics.Arcade.Group;
   private projectiles!: Phaser.Physics.Arcade.Group;
   private typoCreatures: TypoCreature[] = [];
-  private typingText: string = '';
+  private typingText: string = "";
   private highScoreManager!: HighScoreManager;
   private soundManager!: SoundManager;
   private gameOver: boolean = false;
@@ -62,7 +112,7 @@ export class TypoScene extends Phaser.Scene {
   private shotsHit: number = 0;
 
   constructor() {
-    super('TypoScene');
+    super("TypoScene");
   }
 
   create() {
@@ -70,7 +120,7 @@ export class TypoScene extends Phaser.Scene {
     this.killCount = 0;
     this.elapsedMs = 0;
     this.spawnCooldownMs = 0;
-    this.typingText = '';
+    this.typingText = "";
     this.typoCreatures = [];
     this.shotsFired = 0;
     this.shotsHit = 0;
@@ -91,19 +141,19 @@ export class TypoScene extends Phaser.Scene {
 
     this.projectiles = this.physics.add.group({
       maxSize: 50,
-      runChildUpdate: true
+      runChildUpdate: true,
     });
 
     this.creatures = this.physics.add.group({
       classType: Creature,
-      runChildUpdate: false
+      runChildUpdate: false,
     });
 
     this.player = new Player(
       this,
       WORLD_WIDTH / 2,
       WORLD_HEIGHT / 2,
-      this.projectiles
+      this.projectiles,
     );
 
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
@@ -112,9 +162,10 @@ export class TypoScene extends Phaser.Scene {
     this.physics.add.overlap(
       this.player,
       this.creatures,
-      this.onPlayerHitCreature as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback,
-      undefined,
       this
+        .onPlayerHitCreature as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback,
+      undefined,
+      this,
     );
 
     this.createHUD();
@@ -122,24 +173,26 @@ export class TypoScene extends Phaser.Scene {
     this.createPauseMenu();
     this.createGameOverUI();
 
-    this.escapeKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    this.escapeKey = this.input.keyboard!.addKey(
+      Phaser.Input.Keyboard.KeyCodes.ESC,
+    );
 
-    this.input.keyboard!.on('keydown', this.handleKeyDown, this);
+    this.input.keyboard!.on("keydown", this.handleKeyDown, this);
 
-    if (this.textures.exists('crosshair')) {
-      this.crosshair = this.add.image(0, 0, 'crosshair');
+    if (this.textures.exists("crosshair")) {
+      this.crosshair = this.add.image(0, 0, "crosshair");
       this.crosshair.setScrollFactor(0);
       this.crosshair.setDepth(500);
     }
 
-    if (this.textures.exists('ui_cursor')) {
-      this.menuCursor = this.add.image(0, 0, 'ui_cursor');
+    if (this.textures.exists("ui_cursor")) {
+      this.menuCursor = this.add.image(0, 0, "ui_cursor");
       this.menuCursor.setScrollFactor(0);
       this.menuCursor.setDepth(600);
       this.menuCursor.setVisible(false);
     }
 
-    this.input.setDefaultCursor('none');
+    this.input.setDefaultCursor("none");
   }
 
   private createBackground() {
@@ -148,14 +201,14 @@ export class TypoScene extends Phaser.Scene {
     graphics.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     graphics.setDepth(-11);
 
-    const terrain = this.textures.get('terrain');
-    if (terrain && terrain.key !== '__MISSING') {
+    const terrain = this.textures.get("terrain");
+    if (terrain && terrain.key !== "__MISSING") {
       const terrainWidth = terrain.getSourceImage().width;
       const terrainHeight = terrain.getSourceImage().height;
 
       for (let x = 0; x < WORLD_WIDTH; x += terrainWidth) {
         for (let y = 0; y < WORLD_HEIGHT; y += terrainHeight) {
-          const tile = this.add.image(x, y, 'terrain');
+          const tile = this.add.image(x, y, "terrain");
           tile.setOrigin(0, 0);
           tile.setDepth(-10);
           tile.setTint(0xb2b2b2);
@@ -166,47 +219,52 @@ export class TypoScene extends Phaser.Scene {
   }
 
   private createParticleSystems() {
-    const bloodTexture = this.textures.exists('particles_sheet') ? 'particles_sheet' : 'blood_particle';
+    const bloodTexture = this.textures.exists("particles_sheet")
+      ? "particles_sheet"
+      : "blood_particle";
     this.bloodEmitter = this.add.particles(0, 0, bloodTexture, {
-      frame: bloodTexture === 'particles_sheet' ? 5 : 0,
+      frame: bloodTexture === "particles_sheet" ? 5 : 0,
       speed: { min: 80, max: 140 },
       scale: { start: 0.5, end: 1.5 },
       lifespan: 250,
       quantity: 2,
       alpha: { start: 0.8, end: 0 },
-      emitting: false
+      emitting: false,
     });
     this.bloodEmitter.setDepth(15);
   }
 
   private createHUD() {
-    const scale = Math.min(SCREEN_WIDTH / UI.HUD_BASE_WIDTH, SCREEN_HEIGHT / UI.HUD_BASE_HEIGHT);
+    const scale = Math.min(
+      SCREEN_WIDTH / UI.HUD_BASE_WIDTH,
+      SCREEN_HEIGHT / UI.HUD_BASE_HEIGHT,
+    );
     const clampedScale = Math.max(0.75, Math.min(1.5, scale));
 
-    if (this.textures.exists('ui_topbar')) {
-      this.topBarSprite = this.add.image(0, 0, 'ui_topbar');
+    if (this.textures.exists("ui_topbar")) {
+      this.topBarSprite = this.add.image(0, 0, "ui_topbar");
       this.topBarSprite.setOrigin(0, 0);
       this.topBarSprite.setScrollFactor(0);
       this.topBarSprite.setDepth(100);
       this.topBarSprite.setAlpha(UI.ALPHA.TOP_BAR);
     }
 
-    if (this.textures.exists('ui_heart')) {
+    if (this.textures.exists("ui_heart")) {
       this.heartSprite = this.add.image(
         UI.HUD.HEART_CENTER.x * clampedScale,
         UI.HUD.HEART_CENTER.y * clampedScale,
-        'ui_heart'
+        "ui_heart",
       );
       this.heartSprite.setScrollFactor(0);
       this.heartSprite.setDepth(101);
       this.heartSprite.setScale(clampedScale);
     }
 
-    if (this.textures.exists('ui_hpbar_bg')) {
+    if (this.textures.exists("ui_hpbar_bg")) {
       this.healthBarBg = this.add.image(
         UI.HUD.HEALTH_BAR_POS.x * clampedScale,
         UI.HUD.HEALTH_BAR_POS.y * clampedScale,
-        'ui_hpbar_bg'
+        "ui_hpbar_bg",
       );
       this.healthBarBg.setOrigin(0, 0);
       this.healthBarBg.setScrollFactor(0);
@@ -214,11 +272,11 @@ export class TypoScene extends Phaser.Scene {
       this.healthBarBg.setScale(clampedScale);
     }
 
-    if (this.textures.exists('ui_hpbar_fill')) {
+    if (this.textures.exists("ui_hpbar_fill")) {
       this.healthBarFill = this.add.image(
         UI.HUD.HEALTH_BAR_POS.x * clampedScale,
         UI.HUD.HEALTH_BAR_POS.y * clampedScale,
-        'ui_hpbar_fill'
+        "ui_hpbar_fill",
       );
       this.healthBarFill.setOrigin(0, 0);
       this.healthBarFill.setScrollFactor(0);
@@ -246,10 +304,10 @@ export class TypoScene extends Phaser.Scene {
     this.typingBoxGraphics.lineStyle(2, 0x3d3830);
     this.typingBoxGraphics.strokeRect(boxX, boxY, boxW, boxH);
 
-    this.typingTextDisplay = this.add.text(boxX + 10, boxY + 15, '>', {
-      fontSize: '18px',
-      color: '#ffffff',
-      fontFamily: 'monospace'
+    this.typingTextDisplay = this.add.text(boxX + 10, boxY + 15, ">", {
+      fontSize: "18px",
+      color: "#ffffff",
+      fontFamily: "monospace",
     });
     this.typingTextDisplay.setScrollFactor(0);
     this.typingTextDisplay.setDepth(201);
@@ -267,28 +325,40 @@ export class TypoScene extends Phaser.Scene {
       SCREEN_WIDTH,
       SCREEN_HEIGHT,
       0x000000,
-      0.7
+      0.7,
     );
     this.pauseContainer.add(overlay);
 
-    const title = this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 60, 'PAUSED', {
-      fontSize: '32px',
-      color: '#f0c850',
-      fontFamily: 'Arial Black'
-    }).setOrigin(0.5);
+    const title = this.add
+      .text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 60, "PAUSED", {
+        fontSize: "32px",
+        color: "#f0c850",
+        fontFamily: "Arial Black",
+      })
+      .setOrigin(0.5);
     this.pauseContainer.add(title);
 
-    const resumeBtn = this.createButton(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 'RESUME', () => {
-      this.isPaused = false;
-      this.pauseContainer.setVisible(false);
-      if (this.crosshair) this.crosshair.setVisible(true);
-      if (this.menuCursor) this.menuCursor.setVisible(false);
-    });
+    const resumeBtn = this.createButton(
+      SCREEN_WIDTH / 2,
+      SCREEN_HEIGHT / 2,
+      "RESUME",
+      () => {
+        this.isPaused = false;
+        this.pauseContainer.setVisible(false);
+        if (this.crosshair) this.crosshair.setVisible(true);
+        if (this.menuCursor) this.menuCursor.setVisible(false);
+      },
+    );
     this.pauseContainer.add(resumeBtn);
 
-    const quitBtn = this.createButton(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 50, 'QUIT TO MENU', () => {
-      this.scene.start('MenuScene');
-    });
+    const quitBtn = this.createButton(
+      SCREEN_WIDTH / 2,
+      SCREEN_HEIGHT / 2 + 50,
+      "QUIT TO MENU",
+      () => {
+        this.scene.start("MenuScene");
+      },
+    );
     this.pauseContainer.add(quitBtn);
   }
 
@@ -309,7 +379,7 @@ export class TypoScene extends Phaser.Scene {
       SCREEN_WIDTH,
       SCREEN_HEIGHT,
       0x000000,
-      0.8
+      0.8,
     );
     this.gameOverContainer.add(overlay);
 
@@ -318,54 +388,100 @@ export class TypoScene extends Phaser.Scene {
     const panelX = SCREEN_WIDTH / 2;
     const panelY = SCREEN_HEIGHT / 2;
 
-    const panel = this.add.rectangle(panelX, panelY, panelW, panelH, 0x1a1612, 0.95);
+    const panel = this.add.rectangle(
+      panelX,
+      panelY,
+      panelW,
+      panelH,
+      0x1a1612,
+      0.95,
+    );
     panel.setStrokeStyle(2, 0x3d3830);
     this.gameOverContainer.add(panel);
 
-    const title = this.add.text(panelX, panelY - 120, 'GAME OVER', {
-      fontSize: '32px',
-      color: '#cc3333',
-      fontFamily: 'Arial Black'
-    }).setOrigin(0.5);
+    const title = this.add
+      .text(panelX, panelY - 120, "GAME OVER", {
+        fontSize: "32px",
+        color: "#cc3333",
+        fontFamily: "Arial Black",
+      })
+      .setOrigin(0.5);
     this.gameOverContainer.add(title);
 
     const { rank, isHighScore } = this.highScoreManager.addScore(
       this.killCount,
       this.player.level,
       this.elapsedMs,
-      GameMode.TYPO
+      GameMode.TYPO,
+      "",
+      undefined,
+      undefined,
+      this.player.experience,
     );
 
     const timeStr = this.highScoreManager.formatTime(this.elapsedMs);
-    const accuracy = this.shotsFired > 0 ? Math.round((this.shotsHit / this.shotsFired) * 100) : 0;
+    const accuracy =
+      this.shotsFired > 0
+        ? Math.round((this.shotsHit / this.shotsFired) * 100)
+        : 0;
 
     const stats = [
       `Time: ${timeStr}`,
       `Kills: ${this.killCount}`,
       `Words Typed: ${this.shotsFired}`,
-      `Accuracy: ${accuracy}%`
+      `Accuracy: ${accuracy}%`,
     ];
 
     stats.forEach((stat, i) => {
-      const text = this.add.text(panelX, panelY - 60 + i * 30, stat, {
-        fontSize: '18px',
-        color: '#dcdcdc',
-        fontFamily: 'Arial'
-      }).setOrigin(0.5);
+      const text = this.add
+        .text(panelX, panelY - 60 + i * 30, stat, {
+          fontSize: "18px",
+          color: "#dcdcdc",
+          fontFamily: "Arial",
+        })
+        .setOrigin(0.5);
       this.gameOverContainer.add(text);
     });
 
+    let buttonY = panelY + 70;
+
     if (isHighScore) {
-      const hsText = this.add.text(panelX, panelY + 70, `New High Score! Rank #${rank}`, {
-        fontSize: '20px',
-        color: '#f0c850',
-        fontFamily: 'Arial Black'
-      }).setOrigin(0.5);
+      const hsText = this.add
+        .text(panelX, buttonY, `New High Score! Rank #${rank}`, {
+          fontSize: "20px",
+          color: "#f0c850",
+          fontFamily: "Arial Black",
+        })
+        .setOrigin(0.5);
       this.gameOverContainer.add(hsText);
+      buttonY += 30;
     }
 
-    const backBtn = this.createButton(panelX, panelY + 120, 'BACK TO MENU', () => {
-      this.scene.start('MenuScene');
+    const playAgainBtn = this.createButton(
+      panelX,
+      buttonY,
+      "PLAY AGAIN",
+      () => {
+        this.scene.start("TypoScene");
+      },
+    );
+    this.gameOverContainer.add(playAgainBtn);
+
+    const highScoresBtn = this.createButton(
+      panelX,
+      buttonY + 45,
+      "HIGH SCORES",
+      () => {
+        this.scene.start("MenuScene", {
+          initialState: "scores",
+          scoresMode: GameMode.TYPO,
+        });
+      },
+    );
+    this.gameOverContainer.add(highScoresBtn);
+
+    const backBtn = this.createButton(panelX, buttonY + 90, "MAIN MENU", () => {
+      this.scene.start("MenuScene");
     });
     this.gameOverContainer.add(backBtn);
 
@@ -374,7 +490,12 @@ export class TypoScene extends Phaser.Scene {
     if (this.menuCursor) this.menuCursor.setVisible(true);
   }
 
-  private createButton(x: number, y: number, label: string, callback: () => void): Phaser.GameObjects.Container {
+  private createButton(
+    x: number,
+    y: number,
+    label: string,
+    callback: () => void,
+  ): Phaser.GameObjects.Container {
     const container = this.add.container(x, y);
     const btnW = 180;
     const btnH = 36;
@@ -383,25 +504,27 @@ export class TypoScene extends Phaser.Scene {
     bg.setStrokeStyle(2, 0x444444);
     bg.setInteractive({ useHandCursor: true });
 
-    const text = this.add.text(0, 0, label, {
-      fontSize: '14px',
-      color: '#dcdcdc',
-      fontFamily: 'Arial Black'
-    }).setOrigin(0.5);
+    const text = this.add
+      .text(0, 0, label, {
+        fontSize: "14px",
+        color: "#dcdcdc",
+        fontFamily: "Arial Black",
+      })
+      .setOrigin(0.5);
 
-    bg.on('pointerover', () => {
+    bg.on("pointerover", () => {
       bg.setFillStyle(0x404070, 0.9);
       bg.setStrokeStyle(2, 0x8080b0);
-      text.setColor('#ffffff');
+      text.setColor("#ffffff");
     });
 
-    bg.on('pointerout', () => {
+    bg.on("pointerout", () => {
       bg.setFillStyle(0x222222, 0.9);
       bg.setStrokeStyle(2, 0x444444);
-      text.setColor('#dcdcdc');
+      text.setColor("#dcdcdc");
     });
 
-    bg.on('pointerdown', callback);
+    bg.on("pointerdown", callback);
 
     container.add([bg, text]);
     return container;
@@ -410,7 +533,7 @@ export class TypoScene extends Phaser.Scene {
   private handleKeyDown(event: KeyboardEvent) {
     if (this.gameOver || this.isPaused) return;
 
-    if (event.key === 'Escape' || event.key === 'Tab') {
+    if (event.key === "Escape" || event.key === "Tab") {
       this.isPaused = true;
       this.pauseContainer.setVisible(true);
       if (this.crosshair) this.crosshair.setVisible(false);
@@ -418,7 +541,7 @@ export class TypoScene extends Phaser.Scene {
       return;
     }
 
-    if (event.key === 'Backspace') {
+    if (event.key === "Backspace") {
       if (this.typingText.length > 0) {
         this.typingText = this.typingText.slice(0, -1);
         this.soundManager.playUiTypeClick();
@@ -426,7 +549,7 @@ export class TypoScene extends Phaser.Scene {
       return;
     }
 
-    if (event.key === 'Enter') {
+    if (event.key === "Enter") {
       this.submitWord();
       return;
     }
@@ -445,11 +568,11 @@ export class TypoScene extends Phaser.Scene {
 
     this.shotsFired++;
     const enteredWord = this.typingText;
-    this.typingText = '';
+    this.typingText = "";
     this.soundManager.playUiTypeEnter();
 
-    const target = this.typoCreatures.find(tc =>
-      tc.creature.active && tc.word === enteredWord
+    const target = this.typoCreatures.find(
+      (tc) => tc.creature.active && tc.word === enteredWord,
     );
 
     if (target) {
@@ -479,45 +602,64 @@ export class TypoScene extends Phaser.Scene {
 
   private onPlayerHitCreature(
     playerObj: Phaser.Types.Physics.Arcade.GameObjectWithBody,
-    creatureObj: Phaser.Types.Physics.Arcade.GameObjectWithBody
+    creatureObj: Phaser.Types.Physics.Arcade.GameObjectWithBody,
   ) {
     if (this.gameOver) return;
 
     const creature = creatureObj as Creature;
     if (!creature.active) return;
 
-    if (creature.canAttack()) {
-      const damageDealt = creature.attack(this.player);
-      if (damageDealt) {
-        this.cameras.main.shake(100, 0.01);
-      }
-    }
+    creature.setInContactThisFrame(true);
 
     if (this.player.health <= 0) {
       this.showGameOver();
     }
   }
 
+  private processCreatureContactDamage(creature: Creature, dt: number) {
+    if (!creature.active || creature.health <= 0) return;
+    if (this.player.health <= 0) return;
+
+    const shouldDamage = creature.tickContactDamage(
+      dt,
+      creature.wasInContactThisFrame(),
+    );
+    creature.setInContactThisFrame(false);
+
+    if (shouldDamage && this.player.shieldTimer <= 0) {
+      this.player.takeDamage(creature.getContactDamage());
+      this.cameras.main.shake(100, 0.01);
+    }
+  }
+
   private generateWord(scoreXp: number): string {
-    const rand = () => Math.floor(Math.random() * 0x7FFFFFFF);
+    const rand = () => Math.floor(Math.random() * 0x7fffffff);
 
     const pickPart = (allowThe: boolean): string => {
       const mod = allowThe ? 52 : 51;
       const idx = rand() % mod;
-      return NAME_PARTS[idx] || 'nerd';
+      return NAME_PARTS[idx] || "nerd";
     };
 
     if (scoreXp > 120) {
       if (rand() % 100 < 80) {
-        return pickPart(true) + pickPart(false) + pickPart(false) + pickPart(false);
+        return (
+          pickPart(true) + pickPart(false) + pickPart(false) + pickPart(false)
+        );
       }
     }
 
-    if ((scoreXp > 80 && rand() % 100 < 80) || (scoreXp > 60 && rand() % 100 < 40)) {
+    if (
+      (scoreXp > 80 && rand() % 100 < 80) ||
+      (scoreXp > 60 && rand() % 100 < 40)
+    ) {
       return pickPart(true) + pickPart(false) + pickPart(false);
     }
 
-    if ((scoreXp > 40 && rand() % 100 < 80) || (scoreXp > 20 && rand() % 100 < 40)) {
+    if (
+      (scoreXp > 40 && rand() % 100 < 80) ||
+      (scoreXp > 20 && rand() % 100 < 40)
+    ) {
       return pickPart(true) + pickPart(false);
     }
 
@@ -525,7 +667,9 @@ export class TypoScene extends Phaser.Scene {
   }
 
   private isWordUnique(word: string): boolean {
-    return !this.typoCreatures.some(tc => tc.creature.active && tc.word === word);
+    return !this.typoCreatures.some(
+      (tc) => tc.creature.active && tc.word === word,
+    );
   }
 
   private assignWord(creature: Creature): string {
@@ -554,13 +698,18 @@ export class TypoScene extends Phaser.Scene {
       tint,
       speedOverride: 50,
       healthOverride: 1,
-      damageOverride: 100
+      damageOverride: 100,
     };
 
     const spawnRight = Math.random() > 0.5;
     const spawnX = spawnRight ? WORLD_WIDTH + 64 : -64;
 
-    const types = [CreatureType.SPIDER, CreatureType.ALIEN, CreatureType.ZOMBIE, CreatureType.FAST_ZOMBIE];
+    const types = [
+      CreatureType.SPIDER,
+      CreatureType.ALIEN,
+      CreatureType.ZOMBIE,
+      CreatureType.FAST_ZOMBIE,
+    ];
     const type = types[Math.floor(Math.random() * types.length)];
 
     const creature = new Creature(this, spawnX, y, type, undefined, config);
@@ -574,7 +723,10 @@ export class TypoScene extends Phaser.Scene {
     this.spawnCooldownMs -= dtMs;
 
     while (this.spawnCooldownMs < 0) {
-      this.spawnCooldownMs += Math.max(100, 3500 - Math.floor(this.elapsedMs / 800));
+      this.spawnCooldownMs += Math.max(
+        100,
+        3500 - Math.floor(this.elapsedMs / 800),
+      );
 
       this.spawnTypoCreature();
       this.spawnTypoCreature();
@@ -606,30 +758,43 @@ export class TypoScene extends Phaser.Scene {
   }
 
   private updateCreatures(delta: number) {
+    const dt = delta / 1000;
     this.creatures.getChildren().forEach((child) => {
       const creature = child as Creature;
       if (creature.active) {
         creature.update(delta, this.player);
+        this.processCreatureContactDamage(creature, dt);
       }
     });
 
-    this.typoCreatures = this.typoCreatures.filter(tc => tc.creature.active);
+    this.typoCreatures = this.typoCreatures.filter((tc) => tc.creature.active);
   }
 
   private updateHUD() {
-    const scale = Math.min(SCREEN_WIDTH / UI.HUD_BASE_WIDTH, SCREEN_HEIGHT / UI.HUD_BASE_HEIGHT);
+    const scale = Math.min(
+      SCREEN_WIDTH / UI.HUD_BASE_WIDTH,
+      SCREEN_HEIGHT / UI.HUD_BASE_HEIGHT,
+    );
     const clampedScale = Math.max(0.75, Math.min(1.5, scale));
 
     if (this.healthBarFill) {
-      const healthPercent = Math.max(0, this.player.health / this.player.maxHealth);
-      this.healthBarFill.setCrop(0, 0, this.healthBarFill.width * healthPercent, this.healthBarFill.height);
+      const healthPercent = Math.max(
+        0,
+        this.player.health / this.player.maxHealth,
+      );
+      this.healthBarFill.setCrop(
+        0,
+        0,
+        this.healthBarFill.width * healthPercent,
+        this.healthBarFill.height,
+      );
     }
   }
 
   private updateTypingDisplay() {
     const cursorBlink = Math.sin(this.cursorPulseTime * 4) > 0;
-    const cursor = cursorBlink ? '_' : '';
-    this.typingTextDisplay.setText('>' + this.typingText + cursor);
+    const cursor = cursorBlink ? "_" : "";
+    this.typingTextDisplay.setText(">" + this.typingText + cursor);
   }
 
   private updateCursor() {
@@ -645,7 +810,7 @@ export class TypoScene extends Phaser.Scene {
   }
 
   private drawWordLabels() {
-    this.children.getAll().forEach(child => {
+    this.children.getAll().forEach((child) => {
       if ((child as any).isWordLabel) {
         child.destroy();
       }
@@ -666,7 +831,7 @@ export class TypoScene extends Phaser.Scene {
         tc.word.length * 10 + 16,
         20,
         0x000000,
-        0.67
+        0.67,
       );
       bg.setScrollFactor(0);
       bg.setDepth(50);
@@ -677,14 +842,14 @@ export class TypoScene extends Phaser.Scene {
         const remainingPart = tc.word.substring(matchLen);
 
         const typedText = this.add.text(
-          screenX - (tc.word.length * 5),
+          screenX - tc.word.length * 5,
           labelY,
           typedPart,
           {
-            fontSize: '14px',
-            color: '#00ff00',
-            fontFamily: 'monospace'
-          }
+            fontSize: "14px",
+            color: "#00ff00",
+            fontFamily: "monospace",
+          },
         );
         typedText.setOrigin(0, 0.5);
         typedText.setScrollFactor(0);
@@ -692,14 +857,14 @@ export class TypoScene extends Phaser.Scene {
         (typedText as any).isWordLabel = true;
 
         const remainingText = this.add.text(
-          screenX - (tc.word.length * 5) + matchLen * 8.4,
+          screenX - tc.word.length * 5 + matchLen * 8.4,
           labelY,
           remainingPart,
           {
-            fontSize: '14px',
-            color: '#ffffff',
-            fontFamily: 'monospace'
-          }
+            fontSize: "14px",
+            color: "#ffffff",
+            fontFamily: "monospace",
+          },
         );
         remainingText.setOrigin(0, 0.5);
         remainingText.setScrollFactor(0);
@@ -707,9 +872,9 @@ export class TypoScene extends Phaser.Scene {
         (remainingText as any).isWordLabel = true;
       } else {
         const text = this.add.text(screenX, labelY, tc.word, {
-          fontSize: '14px',
-          color: '#ffffff',
-          fontFamily: 'monospace'
+          fontSize: "14px",
+          color: "#ffffff",
+          fontFamily: "monospace",
         });
         text.setOrigin(0.5, 0.5);
         text.setScrollFactor(0);
@@ -732,6 +897,6 @@ export class TypoScene extends Phaser.Scene {
   }
 
   shutdown() {
-    this.input.keyboard?.off('keydown', this.handleKeyDown, this);
+    this.input.keyboard?.off("keydown", this.handleKeyDown, this);
   }
 }

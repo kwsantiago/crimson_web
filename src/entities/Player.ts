@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { WeaponManager } from '../systems/WeaponManager';
+import { WeaponManager, WeaponSoundCallbacks } from '../systems/WeaponManager';
 import { PerkManager } from '../systems/PerkManager';
 import {
   PLAYER_BASE_SPEED,
@@ -124,7 +124,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const dt = delta / 1000;
 
     this.updateTimers(dt);
-    this.weaponManager.update(delta, this.isMoving, pointer.isDown);
+    this.weaponManager.update(delta, this.isMoving, pointer.leftButtonDown());
     this.handleMovement(dt);
     this.handleAiming(pointer);
     this.handleShooting(pointer);
@@ -143,11 +143,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
-    const passiveXp = this.perkManager.getPassiveXpPerSecond();
+    const passiveXp = this.perkManager.getPassiveXpPerTick();
     if (passiveXp > 0) {
       this.passiveXpTimer += dt;
-      if (this.passiveXpTimer >= 1.0) {
-        this.passiveXpTimer = 0;
+      if (this.passiveXpTimer >= 0.25) {
+        this.passiveXpTimer -= 0.25;
         this.addXp(passiveXp);
       }
     }
@@ -206,10 +206,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     let speed = PLAYER_BASE_SPEED;
-    speed *= this.perkManager.getSpeedMultiplier();
 
     if (this.speedBoostTimer > 0) {
-      speed *= 2.0;
+      speed *= 1.5;
     }
 
     this.setVelocity(vx * speed, vy * speed);
@@ -255,7 +254,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   private handleShooting(pointer: Phaser.Input.Pointer) {
-    if (pointer.isDown) {
+    if (pointer.leftButtonDown()) {
       this.weaponManager.fire(this.x, this.y, this.aimAngle, () => this.showMuzzleFlash());
     }
   }
@@ -301,7 +300,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   private updateAnxiousLoader(dt: number, pointer: Phaser.Input.Pointer) {
     if (!this.perkManager.hasAnxiousLoader()) return;
-    if (pointer.isDown) {
+    if (pointer.leftButtonDown()) {
       this.anxiousLoaderTimer = 0;
       return;
     }
@@ -314,8 +313,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   private checkLevelUp(): boolean {
     const xpNeeded = getXpForLevel(this.level);
-    if (this.experience >= xpNeeded) {
-      this.experience -= xpNeeded;
+    if (this.experience > xpNeeded) {
       this.level++;
       return true;
     }
@@ -323,19 +321,21 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   takeDamage(amount: number): { died: boolean; dodged: boolean; triggeredFireCough: boolean } {
+    let damage = amount;
+
+    if (this.perkManager.hasToughReloader() && this.weaponManager.isCurrentlyReloading) {
+      damage *= 0.5;
+    }
+
     if (this.shieldTimer > 0) {
       return { died: false, dodged: false, triggeredFireCough: false };
     }
 
+    damage *= this.perkManager.getDamageReduction();
+
     const dodgeChance = this.perkManager.getDodgeChance();
     if (dodgeChance > 0 && Math.random() < dodgeChance) {
       return { died: false, dodged: true, triggeredFireCough: false };
-    }
-
-    let damage = amount * this.perkManager.getDamageReduction();
-
-    if (this.perkManager.hasToughReloader() && this.weaponManager.isCurrentlyReloading) {
-      damage *= 0.5;
     }
 
     this.health -= damage;
@@ -411,6 +411,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   activateReflexBoost(duration: number) {
     const multiplier = this.perkManager.getBonusDurationMultiplier();
     this.reflexBoostTimer = duration * multiplier;
+    this.weaponManager.refillAmmo();
   }
 
   activateDoubleXp(duration: number) {
@@ -459,5 +460,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   hasActiveEnergizer(): boolean {
     return this.energizerTimer > 0;
+  }
+
+  setWeaponSoundCallbacks(callbacks: WeaponSoundCallbacks) {
+    this.weaponManager.setSoundCallbacks(callbacks);
   }
 }

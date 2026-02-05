@@ -5,7 +5,7 @@ export class Bonus extends Phaser.Physics.Arcade.Sprite {
   bonusType: BonusType;
   weaponId?: number;
   private lifespan: number = 0;
-  private maxLifespan: number = 15000;
+  private maxLifespan: number = 10000;
   private bobOffset: number = 0;
   private baseY: number;
 

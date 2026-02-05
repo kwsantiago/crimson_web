@@ -1,17 +1,15 @@
 export const WORLD_WIDTH = 1024;
 export const WORLD_HEIGHT = 1024;
-export const SCREEN_WIDTH = 800;
-export const SCREEN_HEIGHT = 600;
+export const SCREEN_WIDTH = 1024;
+export const SCREEN_HEIGHT = 768;
 
-export const PLAYER_BASE_SPEED = 150;
+export const PLAYER_BASE_SPEED = 100;
 export const PLAYER_MAX_HEALTH = 100;
 export const PLAYER_RADIUS = 12;
 
-export const XP_PER_LEVEL_BASE = 100;
-export const XP_MULTIPLIER = 1.5;
-
 export function getXpForLevel(level: number): number {
-  return Math.floor(XP_PER_LEVEL_BASE * Math.pow(XP_MULTIPLIER, level - 1));
+  const lvl = Math.max(1, level);
+  return Math.floor(1000 + Math.pow(lvl, 1.8) * 1000);
 }
 
 export const UI = {
@@ -66,6 +64,22 @@ export const UI = {
     SURV_LVL_VALUE_POS: { x: 85, y: 79 },
     SURV_PROGRESS_POS: { x: 26, y: 91 },
     SURV_PROGRESS_WIDTH: 54,
+    SURV_PANEL_SIZE: { w: 182, h: 53 },
+    BONUS_BASE_Y: 121,
+    BONUS_ICON_SIZE: 32,
+    BONUS_SPACING: 52,
+    BONUS_TEXT_OFFSET: { x: 36, y: 6 },
+    BONUS_PANEL_OFFSET_Y: -11,
+    QUEST_LEFT_Y_SHIFT: 80,
+    QUEST_TIME_PANEL_Y: 67,
+    QUEST_PROGRESS_PANEL_Y: 107,
+    QUEST_PANEL_SIZE: { w: 182, h: 53 },
+    QUEST_CLOCK_POS: { x: 2, y: 78 },
+    QUEST_CLOCK_SIZE: 32,
+    QUEST_TIME_TEXT_POS: { x: 32, y: 86 },
+    QUEST_PROGRESS_TEXT_POS: { x: 18, y: 122 },
+    QUEST_PROGRESS_BAR_POS: { x: 10, y: 139 },
+    QUEST_PROGRESS_BAR_WIDTH: 70,
   },
 
   MENU: {

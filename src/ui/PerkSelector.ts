@@ -300,7 +300,11 @@ export class PerkSelector {
         this.numberSprites[i].setScale(this.perkScale * 0.6);
       }
 
-      const nameColor = isSelected ? '#ffffff' : '#46b4f0';
+      const alpha = isSelected ? UI.ALPHA.MENU_ITEM_HOVER : UI.ALPHA.MENU_ITEM_IDLE;
+      const r = (UI.COLORS.MENU_ITEM >> 16) & 0xff;
+      const g = (UI.COLORS.MENU_ITEM >> 8) & 0xff;
+      const b = UI.COLORS.MENU_ITEM & 0xff;
+      const nameColor = `rgba(${r}, ${g}, ${b}, ${alpha})`;
       const fontSize = Math.floor(14 * this.perkScale);
       const nameText = this.scene.add.text(listX, y, perk.name, {
         fontSize: `${fontSize}px`,
@@ -308,6 +312,15 @@ export class PerkSelector {
         fontFamily: 'Arial'
       }).setOrigin(0, 0).setScrollFactor(0).setDepth(1002);
       this.panelTexts.push(nameText);
+
+      const textWidth = nameText.width;
+      const lineY = y + 13 * this.perkScale;
+      const line = this.scene.add.graphics();
+      line.lineStyle(1, UI.COLORS.MENU_ITEM, alpha);
+      line.lineBetween(listX, lineY, listX + textWidth, lineY);
+      line.setScrollFactor(0);
+      line.setDepth(1002);
+      this.container.add(line);
 
       const stackCount = this.perkManager.getPerkCount(this.choices[i]);
       if (stackCount > 0) {

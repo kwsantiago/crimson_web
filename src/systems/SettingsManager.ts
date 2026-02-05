@@ -22,7 +22,9 @@ const DEFAULT_SETTINGS: GameSettings = {
     moveDown: 'S',
     moveLeft: 'A',
     moveRight: 'D',
-    reload: 'R',
+    reload: 'MOUSE3',
+    perkMenu: 'MOUSE2',
+    fire: 'MOUSE1',
     pause: 'ESCAPE'
   }
 };

@@ -92,9 +92,10 @@ export class HighScoreManager {
     mode: GameMode = GameMode.SURVIVAL,
     name: string = '',
     accuracy?: number,
-    weaponId?: number
+    weaponId?: number,
+    experience?: number
   ): { rank: number; isHighScore: boolean; entry: HighScoreEntry } {
-    const score = this.calculateScore(kills, level, timeMs, mode);
+    const score = mode === GameMode.RUSH ? timeMs : (experience ?? 0);
     const entry: HighScoreEntry = {
       name: name.trim().substring(0, 20),
       score,
@@ -137,20 +138,8 @@ export class HighScoreManager {
     }
   }
 
-  private calculateScore(kills: number, level: number, timeMs: number, mode: GameMode): number {
-    const timeBonus = Math.floor(timeMs / 1000);
-    const baseScore = kills * 100 + level * 500 + timeBonus * 10;
-
-    if (mode === GameMode.RUSH) {
-      return Math.floor(baseScore * 1.2);
-    }
-
-    return baseScore;
-  }
-
-  isNewHighScore(kills: number, level: number, timeMs: number, mode: GameMode): boolean {
+  isNewHighScore(score: number, mode: GameMode): boolean {
     const scoresList = this.getScoresList(mode);
-    const score = this.calculateScore(kills, level, timeMs, mode);
     if (scoresList.length < MAX_ENTRIES) return true;
     const lowestScore = scoresList[scoresList.length - 1]?.score || 0;
     return score > lowestScore;

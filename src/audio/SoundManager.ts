@@ -146,7 +146,8 @@ const CREATURE_DEATH_SFX: Partial<Record<CreatureType, string[]>> = {
   [CreatureType.BOSS]: [
     'sfx_trooper_die_01',
     'sfx_trooper_die_02',
-    'sfx_trooper_die_03'
+    'sfx_trooper_die_03',
+    'sfx_trooper_die_04'
   ]
 };
 
@@ -166,7 +167,8 @@ const CREATURE_ATTACK_SFX: Partial<Record<CreatureType, string[]>> = {
 const PLAYER_HURT_SFX = [
   'sfx_trooper_inpain_01',
   'sfx_trooper_inpain_02',
-  'sfx_trooper_inpain_03'
+  'sfx_trooper_inpain_03',
+  'sfx_trooper_inpain_04'
 ];
 
 const BULLET_HIT_SFX = [
@@ -181,59 +183,59 @@ const BULLET_HIT_SFX = [
 const BLOOD_SPILL_SFX = ['sfx_bloodspill_01', 'sfx_bloodspill_02'];
 
 const WEAPON_FIRE_SFX: Record<number, string> = {
-  0: WeaponSfxId.FLAMER_FIRE_01,
-  1: WeaponSfxId.PISTOL_FIRE,
-  2: WeaponSfxId.AUTORIFLE_FIRE,
-  3: WeaponSfxId.AUTORIFLE_FIRE,
-  4: WeaponSfxId.SHOTGUN_FIRE,
-  5: WeaponSfxId.SHOTGUN_FIRE,
-  6: WeaponSfxId.FLAMER_FIRE_01,
-  7: WeaponSfxId.PLASMA_MINIGUN_FIRE,
-  8: WeaponSfxId.PLASMA_MINIGUN_FIRE,
-  9: WeaponSfxId.PLASMA_MINIGUN_FIRE,
-  10: WeaponSfxId.GAUSS_FIRE,
+  0: WeaponSfxId.PISTOL_FIRE,
+  1: WeaponSfxId.AUTORIFLE_FIRE,
+  2: WeaponSfxId.SHOTGUN_FIRE,
+  3: WeaponSfxId.SHOTGUN_FIRE,
+  4: WeaponSfxId.HRPM_FIRE,
+  5: WeaponSfxId.GAUSS_FIRE,
+  6: WeaponSfxId.AUTORIFLE_FIRE,
+  7: WeaponSfxId.FLAMER_FIRE_01,
+  8: WeaponSfxId.SHOCK_FIRE,
+  9: WeaponSfxId.SHOCK_FIRE,
+  10: WeaponSfxId.PLASMA_MINIGUN_FIRE,
   11: WeaponSfxId.ROCKET_FIRE,
-  12: WeaponSfxId.PLASMA_SHOTGUN_FIRE,
-  13: WeaponSfxId.ROCKET_MINI_FIRE,
-  14: WeaponSfxId.SHOCK_FIRE,
-  15: WeaponSfxId.SHOCK_MINIGUN_FIRE,
-  16: WeaponSfxId.SHOCK_FIRE,
-  17: WeaponSfxId.SHOCK_FIRE,
-  18: WeaponSfxId.GAUSS_FIRE,
-  19: WeaponSfxId.PLASMA_SHOTGUN_FIRE,
-  20: WeaponSfxId.GAUSS_FIRE,
-  21: WeaponSfxId.PULSE_FIRE,
+  12: WeaponSfxId.ROCKET_FIRE,
+  13: WeaponSfxId.PLASMA_SHOTGUN_FIRE,
+  14: WeaponSfxId.FLAMER_FIRE_01,
+  15: WeaponSfxId.FLAMER_FIRE_01,
+  16: WeaponSfxId.ROCKET_FIRE,
+  17: WeaponSfxId.ROCKET_MINI_FIRE,
+  18: WeaponSfxId.PULSE_FIRE,
+  19: WeaponSfxId.SHOTGUN_FIRE,
+  20: WeaponSfxId.SHOCK_FIRE,
+  21: WeaponSfxId.SHOCK_MINIGUN_FIRE,
   22: WeaponSfxId.SHOCK_FIRE,
-  23: WeaponSfxId.PLASMA_SHOTGUN_FIRE,
-  24: WeaponSfxId.ROCKET_FIRE
+  23: WeaponSfxId.SHOCK_FIRE,
+  24: WeaponSfxId.SHOCK_FIRE
 };
 
 const WEAPON_RELOAD_SFX: Record<number, string> = {
-  0: WeaponSfxId.AUTORIFLE_RELOAD,
-  1: WeaponSfxId.PISTOL_RELOAD,
-  2: WeaponSfxId.AUTORIFLE_RELOAD,
-  3: WeaponSfxId.AUTORIFLE_RELOAD,
-  4: WeaponSfxId.SHOTGUN_RELOAD,
+  0: WeaponSfxId.PISTOL_RELOAD,
+  1: WeaponSfxId.AUTORIFLE_RELOAD,
+  2: WeaponSfxId.SHOTGUN_RELOAD,
+  3: WeaponSfxId.SHOTGUN_RELOAD,
+  4: WeaponSfxId.AUTORIFLE_RELOAD,
   5: WeaponSfxId.SHOTGUN_RELOAD,
   6: WeaponSfxId.AUTORIFLE_RELOAD,
-  7: WeaponSfxId.SHOCK_RELOAD,
-  8: WeaponSfxId.SHOCK_RELOAD,
-  9: WeaponSfxId.SHOCK_RELOAD,
+  7: WeaponSfxId.AUTORIFLE_RELOAD,
+  8: WeaponSfxId.AUTORIFLE_RELOAD,
+  9: WeaponSfxId.AUTORIFLE_RELOAD,
   10: WeaponSfxId.AUTORIFLE_RELOAD,
   11: WeaponSfxId.AUTORIFLE_RELOAD,
-  12: WeaponSfxId.SHOCK_RELOAD,
-  13: WeaponSfxId.AUTORIFLE_RELOAD,
-  14: WeaponSfxId.SHOCK_RELOAD,
-  15: WeaponSfxId.SHOCK_RELOAD,
-  16: WeaponSfxId.SHOCK_RELOAD,
-  17: WeaponSfxId.SHOCK_RELOAD,
+  12: WeaponSfxId.AUTORIFLE_RELOAD,
+  13: WeaponSfxId.SHOTGUN_RELOAD,
+  14: WeaponSfxId.AUTORIFLE_RELOAD,
+  15: WeaponSfxId.AUTORIFLE_RELOAD,
+  16: WeaponSfxId.AUTORIFLE_RELOAD,
+  17: WeaponSfxId.AUTORIFLE_RELOAD,
   18: WeaponSfxId.AUTORIFLE_RELOAD,
-  19: WeaponSfxId.SHOCK_RELOAD,
-  20: WeaponSfxId.AUTORIFLE_RELOAD,
+  19: WeaponSfxId.SHOTGUN_RELOAD,
+  20: WeaponSfxId.SHOCK_RELOAD,
   21: WeaponSfxId.SHOCK_RELOAD,
   22: WeaponSfxId.SHOCK_RELOAD,
   23: WeaponSfxId.SHOCK_RELOAD,
-  24: WeaponSfxId.AUTORIFLE_RELOAD
+  24: WeaponSfxId.SHOCK_RELOAD
 };
 
 const MAX_HIT_SFX_PER_FRAME = 4;
@@ -431,8 +433,8 @@ export class SoundManager {
   }
 
   playPerkSelect() {
-    this.playSfxInternal(UiSfxId.PANEL_CLICK, 0.6);
-    this.playSfxInternal(UiSfxId.CLINK, 0.3);
+    this.playSfxInternal(UiSfxId.BUTTON_CLICK, 0.6);
+    this.playSfxInternal(UiSfxId.BONUS, 0.8);
   }
 
   playPickupWeapon() {

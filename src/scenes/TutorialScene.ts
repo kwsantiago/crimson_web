@@ -161,7 +161,13 @@ export class TutorialScene extends Phaser.Scene {
       onInstantDeath: () => {},
       onAddPendingPerks: (count) => { this.pendingPerks += count; },
       onSetHealth: (health) => { this.player.health = health; },
-      onReduceMaxHealth: (mult) => { this.player.maxHealth *= mult; }
+      onReduceMaxHealth: (mult) => { this.player.maxHealth *= mult; },
+      onGetXp: () => this.player.experience,
+    });
+
+    this.player.setWeaponSoundCallbacks({
+      onFire: (weaponIndex) => this.soundManager.playWeaponFire(weaponIndex),
+      onReload: (weaponIndex) => this.soundManager.playWeaponReload(weaponIndex),
     });
 
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
@@ -539,9 +545,9 @@ export class TutorialScene extends Phaser.Scene {
           state.stageTransitionTimerMs = -1000;
           this.soundManager.playUiLevelUp();
           this.spawnBonuses([
-            { bonusType: BonusType.XP_LARGE, amount: 500, x: 260, y: 260 },
-            { bonusType: BonusType.XP_LARGE, amount: 1000, x: 600, y: 400 },
-            { bonusType: BonusType.XP_LARGE, amount: 500, x: 300, y: 400 },
+            { bonusType: BonusType.POINTS, amount: 500, x: 260, y: 260 },
+            { bonusType: BonusType.POINTS, amount: 500, x: 600, y: 400 },
+            { bonusType: BonusType.POINTS, amount: 500, x: 300, y: 400 },
           ]);
         }
         break;
@@ -813,6 +819,9 @@ export class TutorialScene extends Phaser.Scene {
     const enemy = creature as Creature;
 
     if (!proj.active || !enemy.active) return;
+
+    this.soundManager.triggerGameTune();
+    this.soundManager.playBulletHit(proj.projectileType);
 
     const damage = proj.damage;
     enemy.takeDamage(damage);

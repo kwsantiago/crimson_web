@@ -172,7 +172,7 @@ export const WEAPON_TABLE: WeaponData[] = [
   makeWeapon(WeaponId.EVIL_SCYTHE, 'Evil Scythe', AmmoClass.ION, 3, 1.0, 3.0, 0.68, 25, null, 45, 1.0, 1, ProjectileType.SCYTHE, 350),
   makeWeapon(WeaponId.PLASMA_CANNON, 'Plasma Cannon', AmmoClass.BULLET, 3, 0.9, 2.7, 0.6, 25, null, 10, 28.0, 1, ProjectileType.PLASMA, 350),
   makeWeapon(WeaponId.SPLITTER_GUN, 'Splitter Gun', AmmoClass.BULLET, 6, 0.7, 2.2, 0.28, 28, null, 30, 6.0, 1, ProjectileType.SPLITTER, 400),
-  makeWeapon(WeaponId.GAUSS_SHOTGUN, 'Gauss Shotgun', AmmoClass.BULLET, 4, 1.05, 2.1, 0.27, 30, 1, 45, 1.0, 1, ProjectileType.GAUSS, 700),
+  makeWeapon(WeaponId.GAUSS_SHOTGUN, 'Gauss Shotgun', AmmoClass.BULLET, 4, 1.05, 2.1, 0.27, 30, 1, 45, 1.0, 6, ProjectileType.GAUSS, 700),
   makeWeapon(WeaponId.ION_SHOTGUN, 'Ion Shotgun', AmmoClass.ION, 10, 0.85, 1.9, 0.27, 31, 1, 45, 1.0, 8, ProjectileType.ION, 500),
   makeWeapon(WeaponId.FLAMEBURST, 'Flameburst', AmmoClass.ION, 60, 0.02, 3.0, 0.18, 29, null, 45, 1.0, 1, ProjectileType.FLAME, 400),
   makeWeapon(WeaponId.RAYGUN, 'RayGun', AmmoClass.ION, 12, 0.7, 2.0, 0.38, 30, null, 45, 1.0, 1, ProjectileType.RAY, 600),

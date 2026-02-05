@@ -36,16 +36,10 @@ const PLASMA_PARTICLE_TYPES = new Set([
   ProjectileType.PLASMA,
   ProjectileType.SHRINK,
   ProjectileType.SPIDER,
-  ProjectileType.PLAGUE,
-  ProjectileType.RAINBOW,
-  ProjectileType.TRANSMUTE,
-  ProjectileType.BLASTER,
 ]);
 
 const BEAM_TYPES = new Set([
   ProjectileType.ION,
-  ProjectileType.FLAME,
-  ProjectileType.RAY,
   ProjectileType.LIGHTNING,
 ]);
 
@@ -56,9 +50,9 @@ const ROCKET_TYPES = new Set([
 ]);
 
 const PROJ_COLORS: Record<ProjectileType, { trail: number; head: number; rgb: [number, number, number] }> = {
-  [ProjectileType.BULLET]: { trail: 0xdcdca0, head: 0xdcdca0, rgb: [0.94, 0.86, 0.63] },
+  [ProjectileType.BULLET]: { trail: 0xf0dca0, head: 0xf0dca0, rgb: [0.94, 0.86, 0.63] },
   [ProjectileType.PLASMA]: { trail: 0xffffff, head: 0xffffff, rgb: [1.0, 1.0, 1.0] },
-  [ProjectileType.GAUSS]: { trail: 0x78c8ff, head: 0x78c8ff, rgb: [0.47, 0.78, 1.0] },
+  [ProjectileType.GAUSS]: { trail: 0x3380ff, head: 0x3380ff, rgb: [0.2, 0.5, 1.0] },
   [ProjectileType.FLAME]: { trail: 0xffaa5a, head: 0xffffff, rgb: [1.0, 0.67, 0.35] },
   [ProjectileType.ROCKET]: { trail: 0xff6600, head: 0xffcc44, rgb: [1.0, 0.4, 0.0] },
   [ProjectileType.NUKE]: { trail: 0xff4400, head: 0xffff44, rgb: [1.0, 0.27, 0.0] },
@@ -154,7 +148,7 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     this.lifespan = 0;
 
     this.penetrating = type === ProjectileType.FLAME || type === ProjectileType.GAUSS ||
-                       type === ProjectileType.LIGHTNING;
+                       type === ProjectileType.LIGHTNING || type === ProjectileType.BLADE;
 
     if (type === ProjectileType.ROCKET || type === ProjectileType.NUKE ||
         type === ProjectileType.SEEKER) {
@@ -386,7 +380,7 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     const step = Math.min(effectScale * 3.1, 9.0);
     const lineWidth = effectScale * 3;
 
-    const streakColor = isFireBullets ? 0xffaa5a : 0x80ccff;
+    const streakColor = isFireBullets ? 0xff991a : 0x8099ff;
 
     for (let s = start; s < dist; s += step) {
       const t = span > 0 ? (s - start) / span : 1.0;

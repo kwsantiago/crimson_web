@@ -20,6 +20,11 @@ import { loadQuestProgress } from './QuestScene';
 
 type MenuState = 'main' | 'mode_select' | 'quest_select' | 'scores' | 'options' | 'statistics' | 'controls' | 'credits';
 
+interface MenuSceneData {
+  initialState?: MenuState;
+  scoresMode?: GameMode;
+}
+
 interface MenuEntry {
   slot: number;
   label: string;
@@ -78,10 +83,15 @@ export class MenuScene extends Phaser.Scene {
     super('MenuScene');
   }
 
-  init() {
+  private initialState: MenuState = 'main';
+  private initialScoresMode: GameMode = GameMode.SURVIVAL;
+
+  init(data?: MenuSceneData) {
+    this.initialState = data?.initialState || 'main';
+    this.initialScoresMode = data?.scoresMode || GameMode.SURVIVAL;
     this.menuState = 'main';
     this.selectedMode = GameMode.SURVIVAL;
-    this.scoresMode = GameMode.SURVIVAL;
+    this.scoresMode = this.initialScoresMode;
     this.timelineMs = 0;
     this.cursorPulseTime = 0;
     this.hoveredIndex = -1;
@@ -154,7 +164,13 @@ export class MenuScene extends Phaser.Scene {
 
     this.soundManager.playMusic(MENU_MUSIC, true);
 
-    this.showMain();
+    if (this.initialState === 'scores') {
+      this.showScores();
+    } else if (this.initialState === 'quest_select') {
+      this.showQuestSelect();
+    } else {
+      this.showMain();
+    }
   }
 
   update(_time: number, delta: number) {
@@ -445,7 +461,7 @@ export class MenuScene extends Phaser.Scene {
       }
 
       const alpha = entry.enabled
-        ? (180 + (entry.hoverAmount * 75) / 1000) / 255
+        ? UI.ALPHA.MENU_ITEM_IDLE + (entry.hoverAmount / 1000) * (UI.ALPHA.MENU_ITEM_HOVER - UI.ALPHA.MENU_ITEM_IDLE)
         : 0.4;
 
       const baseColor = entry.enabled ? UI.COLORS.MENU_ITEM : 0x666666;
@@ -671,8 +687,8 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     bg.on('pointerover', () => {
-      bg.setFillStyle(0x404070, 0.9);
-      bg.setStrokeStyle(2, 0x8080b0);
+      bg.setFillStyle(0x8080b3, 0.9);
+      bg.setStrokeStyle(2, 0x8080b3);
       text.setColor('#ffffff');
     });
 
@@ -1400,8 +1416,8 @@ export class MenuScene extends Phaser.Scene {
     const fixedList = [
       'Fire: Left Mouse Button',
       'Select Perk: Right Mouse Button',
-      'Quick Select Perk: 1-6 Keys',
-      'Switch Weapon: 1-0 Keys'
+      'Reload: Middle Mouse Button',
+      'Quick Select Perk: 1-6 Keys'
     ];
 
     for (const item of fixedList) {

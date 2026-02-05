@@ -8,7 +8,6 @@ export class BonusManager {
   private scene: Phaser.Scene;
   private bonuses: Phaser.Physics.Arcade.Group;
   private player: Player;
-  private baseSpawnChance: number = 0.10;
 
   private onNuke?: () => void;
   private onFreeze?: (duration: number) => void;
@@ -41,9 +40,11 @@ export class BonusManager {
   }
 
   trySpawnBonus(x: number, y: number) {
-    let chance = this.baseSpawnChance;
-
-    if (Math.random() > chance) return;
+    const baseRoll = Math.floor(Math.random() * 9);
+    if (baseRoll !== 1) {
+      if (!this.player.perkManager.hasBonusMagnet()) return;
+      if (Math.floor(Math.random() * 10) !== 2) return;
+    }
 
     const type = pickRandomBonusType();
     this.spawnBonus(x, y, type);
@@ -76,12 +77,9 @@ export class BonusManager {
     const data = getBonusData(bonus.bonusType);
 
     switch (bonus.bonusType) {
-      case BonusType.XP_SMALL:
-      case BonusType.XP_MEDIUM:
-      case BonusType.XP_LARGE:
-        if (data.xpValue) {
-          this.player.addXp(data.xpValue);
-        }
+      case BonusType.POINTS:
+        const xpValue = (Math.floor(Math.random() * 8) < 3) ? 1000 : 500;
+        this.player.addXp(xpValue);
         break;
 
       case BonusType.MEDIKIT:

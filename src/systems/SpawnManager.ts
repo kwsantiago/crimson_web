@@ -137,78 +137,92 @@ export class SpawnManager {
   }
 
   private updateStage() {
-    if (this.spawnStage === 0 && this.playerLevel >= 3) {
+    if (this.spawnStage === 0 && this.playerLevel >= 5) {
       this.spawnStage = 1;
       if (!this.stageNotified[1]) {
         this.stageNotified[1] = true;
-        this.spawnCreatureGroup(CreatureType.FAST_ZOMBIE, 6);
-      }
-    }
-    if (this.spawnStage === 1 && this.playerLevel >= 5) {
-      this.spawnStage = 2;
-      if (!this.stageNotified[2]) {
-        this.stageNotified[2] = true;
+        this.spawnRingFormation(CreatureType.ALIEN, 8, 100);
         this.spawnRingFormation(CreatureType.ALIEN, 8, 100);
       }
     }
-    if (this.spawnStage === 2 && this.playerLevel >= 7) {
+    if (this.spawnStage === 1 && this.playerLevel >= 9) {
+      this.spawnStage = 2;
+      if (!this.stageNotified[2]) {
+        this.stageNotified[2] = true;
+        this.spawnAlienBoss(WORLD_WIDTH + 50, WORLD_HEIGHT / 2);
+      }
+    }
+    if (this.spawnStage === 2 && this.playerLevel >= 11) {
       this.spawnStage = 3;
       if (!this.stageNotified[3]) {
         this.stageNotified[3] = true;
-        this.spawnCreatureGroup(CreatureType.BIG_ZOMBIE, 4);
+        const step = 128.0 / 3.0;
+        for (let i = 0; i < 12; i++) {
+          this.spawnCreature(CreatureType.SPIDER_MOTHER, WORLD_WIDTH + 50, i * step + 256);
+        }
       }
     }
-    if (this.spawnStage === 3 && this.playerLevel >= 9) {
+    if (this.spawnStage === 3 && this.playerLevel >= 13) {
       this.spawnStage = 4;
       if (!this.stageNotified[4]) {
         this.stageNotified[4] = true;
-        this.spawnSplitter(WORLD_WIDTH + 50, WORLD_HEIGHT / 2);
+        for (let i = 0; i < 4; i++) {
+          this.spawnFastAlien(WORLD_WIDTH + 50, i * 64 + 384);
+        }
       }
     }
-    if (this.spawnStage === 4 && this.playerLevel >= 11) {
+    if (this.spawnStage === 4 && this.playerLevel >= 15) {
       this.spawnStage = 5;
       if (!this.stageNotified[5]) {
         this.stageNotified[5] = true;
-        this.spawnCreatureGroup(CreatureType.SPIDER_MOTHER, 3);
+        for (let i = 0; i < 4; i++) {
+          this.spawnOrbiter(WORLD_WIDTH + 50, i * 64 + 384);
+          this.spawnOrbiter(-50, i * 64 + 384);
+        }
       }
     }
-    if (this.spawnStage === 5 && this.playerLevel >= 13) {
+    if (this.spawnStage === 5 && this.playerLevel >= 17) {
       this.spawnStage = 6;
       if (!this.stageNotified[6]) {
         this.stageNotified[6] = true;
-        this.spawnChainFormation(CreatureType.LIZARD, 4);
-      }
-    }
-    if (this.spawnStage === 6 && this.playerLevel >= 15) {
-      this.spawnStage = 7;
-      if (!this.stageNotified[7]) {
-        this.stageNotified[7] = true;
-        this.spawnOrbiter(WORLD_WIDTH + 50, WORLD_HEIGHT / 2);
-        this.spawnOrbiter(-50, WORLD_HEIGHT / 2);
-      }
-    }
-    if (this.spawnStage === 7 && this.playerLevel >= 17) {
-      this.spawnStage = 8;
-      if (!this.stageNotified[8]) {
-        this.stageNotified[8] = true;
         this.spawnShockBoss(WORLD_WIDTH + 50, WORLD_HEIGHT / 2);
       }
     }
-    if (this.spawnStage === 8 && this.playerLevel >= 20) {
+    if (this.spawnStage === 6 && this.playerLevel >= 19) {
+      this.spawnStage = 7;
+      if (!this.stageNotified[7]) {
+        this.stageNotified[7] = true;
+        this.spawnSplitter(640, WORLD_HEIGHT / 2);
+      }
+    }
+    if (this.spawnStage === 7 && this.playerLevel >= 21) {
+      this.spawnStage = 8;
+      if (!this.stageNotified[8]) {
+        this.stageNotified[8] = true;
+        this.spawnSplitter(384, 256);
+        this.spawnSplitter(640, 768);
+      }
+    }
+    if (this.spawnStage === 8 && this.playerLevel >= 26) {
       this.spawnStage = 9;
       if (!this.stageNotified[9]) {
         this.stageNotified[9] = true;
-        this.spawnRangedVariant(WORLD_WIDTH + 50, WORLD_HEIGHT / 2 - 100);
-        this.spawnRangedVariant(WORLD_WIDTH + 50, WORLD_HEIGHT / 2 + 100);
-        this.spawnRangedVariant(-50, WORLD_HEIGHT / 2 - 100);
-        this.spawnRangedVariant(-50, WORLD_HEIGHT / 2 + 100);
+        for (let i = 0; i < 4; i++) {
+          this.spawnRangedVariant(WORLD_WIDTH + 50, i * 64 + 384);
+          this.spawnRangedVariant(-50, i * 64 + 384);
+        }
       }
     }
-    if (this.spawnStage === 9 && this.playerLevel >= 25) {
+    if (this.spawnStage === 9 && this.playerLevel > 31) {
       this.spawnStage = 10;
       if (!this.stageNotified[10]) {
         this.stageNotified[10] = true;
-        this.spawnGridFormation(CreatureType.ALIEN, -50, WORLD_HEIGHT / 2);
+        this.spawnShockBoss(WORLD_WIDTH + 50, WORLD_HEIGHT / 2);
+        this.spawnShockBoss(-50, WORLD_HEIGHT / 2);
+        for (let i = 0; i < 4; i++) {
+          this.spawnRangedVariant(i * 64 + 384, -50);
+          this.spawnRangedVariant(i * 64 + 384, WORLD_HEIGHT + 50);
+        }
       }
     }
   }
@@ -268,78 +282,54 @@ export class SpawnManager {
   }
 
   private pickCreatureType(): CreatureType {
-    const roll = Math.random();
+    const r10 = Math.floor(Math.random() * 10);
+    const xp = this.playerXp;
 
-    switch (this.spawnStage) {
-      case 0:
-        return CreatureType.ZOMBIE;
+    let typeId: number;
 
-      case 1:
-        if (roll < 0.7) return CreatureType.ZOMBIE;
-        return CreatureType.FAST_ZOMBIE;
+    if (xp < 12000) {
+      typeId = r10 < 9 ? 2 : 3;
+    } else if (xp < 25000) {
+      if (r10 < 4) {
+        typeId = 0;
+      } else if (r10 > 8) {
+        typeId = 2;
+      } else {
+        typeId = 3;
+      }
+    } else if (xp < 42000) {
+      if (r10 < 5) {
+        typeId = 2;
+      } else {
+        typeId = (Math.random() < 0.5) ? 3 : 4;
+      }
+    } else if (xp < 50000) {
+      typeId = 2;
+    } else if (xp < 90000) {
+      typeId = 4;
+    } else if (xp > 109999) {
+      if (r10 < 6) {
+        typeId = 2;
+      } else if (r10 < 9) {
+        typeId = 4;
+      } else {
+        typeId = 0;
+      }
+    } else {
+      typeId = 0;
+    }
 
-      case 2:
-        if (roll < 0.5) return CreatureType.ZOMBIE;
-        if (roll < 0.7) return CreatureType.FAST_ZOMBIE;
-        return CreatureType.SPIDER;
+    if ((Math.floor(Math.random() * 32) & 0x1F) === 2) {
+      typeId = 3;
+    }
 
-      case 3:
-        if (roll < 0.4) return CreatureType.ZOMBIE;
-        if (roll < 0.55) return CreatureType.FAST_ZOMBIE;
-        if (roll < 0.7) return CreatureType.SPIDER;
-        if (roll < 0.9) return CreatureType.BIG_ZOMBIE;
-        return CreatureType.BABY_SPIDER;
-
-      case 4:
-        if (roll < 0.3) return CreatureType.ZOMBIE;
-        if (roll < 0.45) return CreatureType.FAST_ZOMBIE;
-        if (roll < 0.6) return CreatureType.SPIDER;
-        if (roll < 0.75) return CreatureType.BIG_ZOMBIE;
-        return CreatureType.ALIEN;
-
-      case 5:
-        if (roll < 0.25) return CreatureType.ZOMBIE;
-        if (roll < 0.4) return CreatureType.FAST_ZOMBIE;
-        if (roll < 0.55) return CreatureType.SPIDER;
-        if (roll < 0.65) return CreatureType.BIG_ZOMBIE;
-        if (roll < 0.8) return CreatureType.ALIEN;
-        if (roll < 0.95) return CreatureType.SPIDER_MOTHER;
-        return CreatureType.BABY_SPIDER;
-
-      case 6:
-        if (roll < 0.2) return CreatureType.ZOMBIE;
-        if (roll < 0.3) return CreatureType.FAST_ZOMBIE;
-        if (roll < 0.45) return CreatureType.SPIDER;
-        if (roll < 0.55) return CreatureType.BIG_ZOMBIE;
-        if (roll < 0.65) return CreatureType.ALIEN;
-        if (roll < 0.75) return CreatureType.SPIDER_MOTHER;
-        return CreatureType.LIZARD;
-
-      case 7:
-        if (roll < 0.15) return CreatureType.ZOMBIE;
-        if (roll < 0.25) return CreatureType.FAST_ZOMBIE;
-        if (roll < 0.35) return CreatureType.SPIDER;
-        if (roll < 0.45) return CreatureType.BIG_ZOMBIE;
-        if (roll < 0.55) return CreatureType.ALIEN;
-        if (roll < 0.65) return CreatureType.SPIDER_MOTHER;
-        if (roll < 0.75) return CreatureType.LIZARD;
-        if (roll < 0.85) return CreatureType.ALIEN_ELITE;
-        return CreatureType.LIZARD_SPITTER;
-
-      case 8:
-      case 9:
-      case 10:
-      default:
-        if (roll < 0.1) return CreatureType.ZOMBIE;
-        if (roll < 0.2) return CreatureType.FAST_ZOMBIE;
-        if (roll < 0.3) return CreatureType.SPIDER;
-        if (roll < 0.4) return CreatureType.BIG_ZOMBIE;
-        if (roll < 0.5) return CreatureType.ALIEN;
-        if (roll < 0.6) return CreatureType.SPIDER_MOTHER;
-        if (roll < 0.7) return CreatureType.LIZARD;
-        if (roll < 0.8) return CreatureType.ALIEN_ELITE;
-        if (roll < 0.9) return CreatureType.LIZARD_SPITTER;
-        return CreatureType.BABY_SPIDER;
+    switch (typeId) {
+      case 0: return CreatureType.ZOMBIE;
+      case 1: return CreatureType.LIZARD;
+      case 2: return CreatureType.ALIEN;
+      case 3: return CreatureType.SPIDER;
+      case 4: return CreatureType.SPIDER_MOTHER;
+      default: return CreatureType.ALIEN;
     }
   }
 
@@ -356,7 +346,8 @@ export class SpawnManager {
     applyRushModifiers: boolean = false
   ) {
     const rand = () => Math.floor(Math.random() * 0x7FFFFFFF);
-    const baseHealth = 20 + this.playerXp * 0.00125;
+    const rHealth = rand();
+    const baseHealth = this.playerXp * 0.00125 + (rHealth & 0xF) + 52.0;
     const baseReward = baseHealth * 0.4 + 15;
 
     const variant = rollVariantStats(baseHealth, baseReward, rand);
@@ -392,6 +383,14 @@ export class SpawnManager {
       const spider = new Creature(this.scene, x + offsetX, y + offsetY, CreatureType.BABY_SPIDER);
       this.creatures.add(spider);
     }
+  }
+
+  spawnChildCreature(x: number, y: number, type: CreatureType) {
+    const offsetX = (Math.random() - 0.5) * 40;
+    const offsetY = (Math.random() - 0.5) * 40;
+    const creature = new Creature(this.scene, x + offsetX, y + offsetY, type, this.enemyProjectiles);
+    this.creatures.add(creature);
+    return creature;
   }
 
   spawnSplitChildren(parentX: number, parentY: number, children: {
@@ -570,6 +569,29 @@ export class SpawnManager {
       tint: { r: 0.8, g: 0.7, b: 0.4, a: 1.0 }
     };
     this.spawnCreature(CreatureType.SPIDER_MOTHER, x, y, config);
+  }
+
+  private spawnAlienBoss(x: number, y: number) {
+    const config: CreatureConfig = {
+      healthOverride: 600,
+      speedOverride: 72,
+      xpOverride: 900,
+      damageOverride: 20,
+      sizeOverride: 56,
+      tint: { r: 0.9, g: 0.2, b: 0.2, a: 1.0 }
+    };
+    this.spawnCreature(CreatureType.ALIEN, x, y, config);
+  }
+
+  private spawnFastAlien(x: number, y: number) {
+    const config: CreatureConfig = {
+      healthOverride: 80,
+      speedOverride: 120,
+      xpOverride: 120,
+      damageOverride: 12,
+      tint: { r: 0.9, g: 0.3, b: 0.3, a: 1.0 }
+    };
+    this.spawnCreature(CreatureType.ALIEN, x, y, config);
   }
 
   private getSpawnPosition(): { x: number; y: number } {

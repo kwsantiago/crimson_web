@@ -1,6 +1,11 @@
-import Phaser from 'phaser';
-import { Player } from './Player';
-import { CreatureType, CreatureData, getCreatureData, CREATURES } from '../data/creatures';
+import Phaser from "phaser";
+import { Player } from "./Player";
+import {
+  CreatureType,
+  CreatureData,
+  getCreatureData,
+  CREATURES,
+} from "../data/creatures";
 import {
   AIMode,
   CreatureFlags,
@@ -13,8 +18,8 @@ import {
   TintRGBA,
   tintToHex,
   CREATURE_SPEED_SCALE,
-  CREATURE_TURN_RATE_SCALE
-} from '../systems/CreatureAI';
+  CREATURE_TURN_RATE_SCALE,
+} from "../systems/CreatureAI";
 
 export interface CreatureConfig {
   aiMode?: AIMode;
@@ -32,6 +37,8 @@ export interface CreatureConfig {
   damageOverride?: number;
   xpOverride?: number;
   rangedProjectileType?: number;
+  spawnTimerOverride?: number;
+  spawnTypeOverride?: CreatureType;
 }
 
 let creaturePool: Creature[] = [];
@@ -60,6 +67,12 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
   isRanged: boolean;
   spawnsOnDeath?: CreatureType;
   spawnCount: number;
+  isStationary: boolean = false;
+  spawnTimer: number = 0;
+  spawnInterval: number = 0;
+  spawnType?: CreatureType;
+  spawnCount_limit: number = 100;
+  spawnCount_current: number = 0;
   freezeTimer: number = 0;
   poisonTimer: number = 0;
   fleeTimer: number = 0;
@@ -83,8 +96,9 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
   customTint: TintRGBA | null = null;
   splitSize: number = 0;
 
-  private attackCooldown: number = 0;
-  private attackRate: number = 1.0;
+  private collisionTimer: number = 0.5;
+  private readonly CONTACT_DAMAGE_PERIOD: number = 0.5;
+  private rangedAttackCooldown: number = 0;
   private projectileCooldown: number = 0;
   private projectileRate: number = 2.0;
   private projectiles?: Phaser.Physics.Arcade.Group;
@@ -92,6 +106,7 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
   private poisonDps: number = 6;
   private freezePulseTimer: number = 0;
   private isDying: boolean = false;
+  private inContactThisFrame: boolean = false;
   private shadow: Phaser.GameObjects.Sprite;
   private animPhase: number = 0;
   private readonly SHADOW_SCALE = 1.07;
@@ -107,23 +122,23 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     y: number,
     type: CreatureType = CreatureType.ZOMBIE,
     projectiles?: Phaser.Physics.Arcade.Group,
-    config?: CreatureConfig
+    config?: CreatureConfig,
   ) {
     const data = getCreatureData(type);
     const sheetMap: Record<string, string> = {
-      'zombie': 'zombie_sheet',
-      'fast_zombie': 'zombie_sheet',
-      'big_zombie': 'zombie_sheet',
-      'spider': 'spider_sp1_sheet',
-      'baby_spider': 'spider_sp1_sheet',
-      'spider_mother': 'spider_sp2_sheet',
-      'alien': 'alien_sheet',
-      'alien_elite': 'alien_sheet',
-      'alien_boss': 'alien_sheet',
-      'lizard': 'lizard_sheet',
-      'lizard_spitter': 'lizard_sheet',
-      'nest': 'nest',
-      'boss': 'zombie_sheet'
+      zombie: "zombie_sheet",
+      fast_zombie: "zombie_sheet",
+      big_zombie: "zombie_sheet",
+      spider: "spider_sp1_sheet",
+      baby_spider: "spider_sp1_sheet",
+      spider_mother: "spider_sp2_sheet",
+      alien: "alien_sheet",
+      alien_elite: "alien_sheet",
+      alien_boss: "alien_sheet",
+      lizard: "lizard_sheet",
+      lizard_spitter: "lizard_sheet",
+      nest: "nest",
+      boss: "zombie_sheet",
     };
     const sheetKey = sheetMap[type] || type;
     super(scene, x, y, sheetKey, 0);
@@ -134,7 +149,12 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     this.creatureType = type;
     this.projectiles = projectiles;
 
-    this.shadow = scene.add.sprite(x + this.SHADOW_OFFSET, y + this.SHADOW_OFFSET, sheetKey, 0);
+    this.shadow = scene.add.sprite(
+      x + this.SHADOW_OFFSET,
+      y + this.SHADOW_OFFSET,
+      sheetKey,
+      0,
+    );
     this.shadow.setTint(0x000000);
     this.shadow.setAlpha(this.SHADOW_ALPHA);
     this.shadow.setDepth(4);
@@ -156,6 +176,10 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     this.spawnsOnDeath = data.spawnsOnDeath;
     this.spawnCount = data.spawnCount || 0;
     this.splitSize = config?.sizeOverride ?? 50;
+    this.isStationary = data.isStationary ?? false;
+    this.spawnType = config?.spawnTypeOverride ?? data.spawnType;
+    this.spawnInterval = config?.spawnTimerOverride ?? data.spawnTimer ?? 0;
+    this.spawnTimer = this.spawnInterval;
 
     if (data.projectileCooldown) {
       this.projectileRate = data.projectileCooldown;
@@ -181,7 +205,7 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
-    this.phaseSeed = config?.phaseSeed ?? (Math.random() * 0x17F);
+    this.phaseSeed = config?.phaseSeed ?? Math.random() * 0x17f;
     this.heading = Math.random() * Math.PI * 2;
     this.targetX = x;
     this.targetY = y;
@@ -210,7 +234,7 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
       targetY: this.targetY,
       targetHeading: this.targetHeading,
       forceTarget: this.forceTarget,
-      moveScale: this.moveScale
+      moveScale: this.moveScale,
     };
   }
 
@@ -230,9 +254,12 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
 
     const dt = delta / 1000;
     const dtMs = delta;
-    this.attackCooldown = Math.max(0, this.attackCooldown - dt);
+    this.rangedAttackCooldown = Math.max(0, this.rangedAttackCooldown - dt);
 
-    this.shadow.setPosition(this.x + this.SHADOW_OFFSET, this.y + this.SHADOW_OFFSET);
+    this.shadow.setPosition(
+      this.x + this.SHADOW_OFFSET,
+      this.y + this.SHADOW_OFFSET,
+    );
     this.shadow.setRotation(this.rotation);
     this.shadow.setFrame(this.frame.name);
 
@@ -241,7 +268,8 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
       this.setVelocity(0, 0);
       this.freezePulseTimer += dt;
       const pulse = 0.95 + Math.sin(this.freezePulseTimer * 8) * 0.05;
-      const baseScale = getCreatureData(this.creatureType).scale * (this.splitSize / 50);
+      const baseScale =
+        getCreatureData(this.creatureType).scale * (this.splitSize / 50);
       this.setScale(pulse * baseScale);
       this.shadow.setScale(pulse * baseScale * this.SHADOW_SCALE);
       this.setTint(0x66ddff);
@@ -249,7 +277,8 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     } else {
       if (this.freezePulseTimer > 0) {
         this.freezePulseTimer = 0;
-        const baseScale = getCreatureData(this.creatureType).scale * (this.splitSize / 50);
+        const baseScale =
+          getCreatureData(this.creatureType).scale * (this.splitSize / 50);
         this.setScale(baseScale);
         this.shadow.setScale(baseScale * this.SHADOW_SCALE);
       }
@@ -304,7 +333,11 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     if (this.fleeTimer > 0) {
       this.fleeTimer -= dt;
       this.setTint(0xffff00);
-    } else if (this.fleeTimer <= 0 && this.poisonTimer <= 0 && this.freezeTimer <= 0) {
+    } else if (
+      this.fleeTimer <= 0 &&
+      this.poisonTimer <= 0 &&
+      this.freezeTimer <= 0
+    ) {
       if (this.customTint) {
         this.setTint(tintToHex(this.customTint));
       } else {
@@ -312,20 +345,26 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
-    const creatures: CreatureLink[] = creaturePool.map(c => ({
+    const creatures: CreatureLink[] = creaturePool.map((c) => ({
       x: c.x,
       y: c.y,
       hp: c.health,
-      active: c.active && !c.isDying
+      active: c.active && !c.isDying,
     }));
 
-    const rand = () => Math.floor(Math.random() * 0x7FFFFFFF);
+    const rand = () => Math.floor(Math.random() * 0x7fffffff);
 
     const aiState = this.getAIState();
 
     tickAI7LinkTimer(aiState, dtMs, rand);
 
-    const result = updateCreatureAITarget(aiState, player.x, player.y, creatures, dt);
+    const result = updateCreatureAITarget(
+      aiState,
+      player.x,
+      player.y,
+      creatures,
+      dt,
+    );
 
     this.applyAIState(aiState);
     this.moveScale = result.moveScale;
@@ -346,21 +385,24 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
       const dist = Math.hypot(dx, dy);
       if (dist > 0) {
         const fleeSpeed = this.speed * 1.5;
-        this.setVelocity(
-          ((-dx) / dist) * fleeSpeed,
-          ((-dy) / dist) * fleeSpeed
-        );
+        this.setVelocity((-dx / dist) * fleeSpeed, (-dy / dist) * fleeSpeed);
         const heading = Math.atan2(-dy, -dx);
         this.setRotation(heading + Math.PI);
         this.animPhase += dt * this.ANIM_RATE * (fleeSpeed / 100);
       }
-    } else if (this.aiMode === AIMode.HOLD) {
+    } else if (this.aiMode === AIMode.HOLD || this.isStationary) {
       this.setVelocity(0, 0);
     } else {
-      const turnRate = (this.speed / CREATURE_SPEED_SCALE) * CREATURE_TURN_RATE_SCALE;
-      this.heading = angleApproach(this.heading, this.targetHeading, turnRate, dt);
+      const turnRate =
+        (this.speed / CREATURE_SPEED_SCALE) * CREATURE_TURN_RATE_SCALE;
+      this.heading = angleApproach(
+        this.heading,
+        this.targetHeading,
+        turnRate,
+        dt,
+      );
 
-      const speed = (this.speed / CREATURE_SPEED_SCALE) * CREATURE_SPEED_SCALE * this.moveScale;
+      const speed = this.speed * this.moveScale;
 
       const dirX = Math.cos(this.heading - Math.PI / 2.0);
       const dirY = Math.sin(this.heading - Math.PI / 2.0);
@@ -377,26 +419,42 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
       this.projectileCooldown -= dt;
       const distToPlayer = Math.hypot(player.x - this.x, player.y - this.y);
 
-      if (distToPlayer > 64 && this.projectileCooldown <= 0 && this.projectiles) {
+      if (
+        distToPlayer > 64 &&
+        this.projectileCooldown <= 0 &&
+        this.projectiles
+      ) {
         this.fireProjectile(player);
         this.projectileCooldown = this.projectileRate;
       }
     }
 
-    if (this.flags & CreatureFlags.RANGED_ATTACK_SHOCK && !isFleeing) {
-      const distToPlayer = Math.hypot(player.x - this.x, player.y - this.y);
-      if (distToPlayer > 64 && this.attackCooldown <= 0) {
-        this.fireShockProjectile(player);
-        this.attackCooldown = 1.0;
+    if (
+      this.flags &
+        (CreatureFlags.RANGED_ATTACK_SHOCK |
+          CreatureFlags.RANGED_ATTACK_VARIANT) &&
+      !isFleeing
+    ) {
+      if (this.rangedAttackCooldown > 0) {
+        this.rangedAttackCooldown -= dt;
       }
-    }
 
-    if (this.flags & CreatureFlags.RANGED_ATTACK_VARIANT && !isFleeing) {
       const distToPlayer = Math.hypot(player.x - this.x, player.y - this.y);
-      if (distToPlayer > 64 && this.attackCooldown <= 0) {
-        this.fireVariantProjectile(player);
-        const randDelay = (Math.random() * 3) * 0.1;
-        this.attackCooldown = this.orbitAngle + randDelay;
+      if (distToPlayer > 64 && this.rangedAttackCooldown <= 0) {
+        if (this.flags & CreatureFlags.RANGED_ATTACK_SHOCK) {
+          this.fireShockProjectile();
+          this.rangedAttackCooldown += 1.0;
+        }
+
+        if (
+          this.flags & CreatureFlags.RANGED_ATTACK_VARIANT &&
+          this.rangedAttackCooldown <= 0
+        ) {
+          this.fireVariantProjectile();
+          const randDelay = Math.floor(Math.random() * 4) * 0.1;
+          this.rangedAttackCooldown =
+            this.orbitAngle + randDelay + this.rangedAttackCooldown;
+        }
       }
     }
 
@@ -405,11 +463,24 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     this.setFrame(frame);
   }
 
+  tickSpawnSlot(dt: number): CreatureType | null {
+    if (!this.spawnType || this.spawnInterval <= 0) return null;
+    if (this.spawnCount_current >= this.spawnCount_limit) return null;
+
+    this.spawnTimer -= dt;
+    if (this.spawnTimer < 0) {
+      this.spawnTimer += this.spawnInterval;
+      this.spawnCount_current++;
+      return this.spawnType;
+    }
+    return null;
+  }
+
   private fireProjectile(player: Player) {
     if (!this.projectiles) return;
 
     const angle = Math.atan2(player.y - this.y, player.x - this.x);
-    const bullet = this.projectiles.get(this.x, this.y, 'alien_projectile');
+    const bullet = this.projectiles.get(this.x, this.y, "alien_projectile");
     if (bullet) {
       bullet.setActive(true);
       bullet.setVisible(true);
@@ -419,19 +490,16 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
       const body = bullet.body as Phaser.Physics.Arcade.Body;
       if (body) {
         body.enable = true;
-        body.setVelocity(
-          Math.cos(angle) * 200,
-          Math.sin(angle) * 200
-        );
+        body.setVelocity(Math.cos(angle) * 200, Math.sin(angle) * 200);
       }
     }
   }
 
-  private fireShockProjectile(player: Player) {
+  private fireShockProjectile() {
     if (!this.projectiles) return;
 
-    const angle = Math.atan2(player.y - this.y, player.x - this.x);
-    const bullet = this.projectiles.get(this.x, this.y, 'alien_projectile');
+    const angle = this.heading;
+    const bullet = this.projectiles.get(this.x, this.y, "alien_projectile");
     if (bullet) {
       bullet.setActive(true);
       bullet.setVisible(true);
@@ -442,19 +510,16 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
       const body = bullet.body as Phaser.Physics.Arcade.Body;
       if (body) {
         body.enable = true;
-        body.setVelocity(
-          Math.cos(angle) * 300,
-          Math.sin(angle) * 300
-        );
+        body.setVelocity(Math.cos(angle) * 300, Math.sin(angle) * 300);
       }
     }
   }
 
-  private fireVariantProjectile(player: Player) {
+  private fireVariantProjectile() {
     if (!this.projectiles) return;
 
-    const angle = Math.atan2(player.y - this.y, player.x - this.x);
-    const bullet = this.projectiles.get(this.x, this.y, 'alien_projectile');
+    const angle = this.heading;
+    const bullet = this.projectiles.get(this.x, this.y, "alien_projectile");
     if (bullet) {
       bullet.setActive(true);
       bullet.setVisible(true);
@@ -465,25 +530,35 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
       const body = bullet.body as Phaser.Physics.Arcade.Body;
       if (body) {
         body.enable = true;
-        body.setVelocity(
-          Math.cos(angle) * 250,
-          Math.sin(angle) * 250
-        );
+        body.setVelocity(Math.cos(angle) * 250, Math.sin(angle) * 250);
       }
     }
   }
 
-  canAttack(): boolean {
-    return this.attackCooldown <= 0;
+  tickContactDamage(dt: number, inContact: boolean): boolean {
+    if (!inContact) {
+      return false;
+    }
+
+    this.collisionTimer -= dt;
+    if (this.collisionTimer >= 0) {
+      return false;
+    }
+
+    this.collisionTimer += this.CONTACT_DAMAGE_PERIOD;
+    return this.damage > 0;
   }
 
-  attack(player: Player): boolean {
-    if (this.canAttack() && this.damage > 0) {
-      player.takeDamage(this.damage);
-      this.attackCooldown = this.attackRate;
-      return true;
-    }
-    return false;
+  getContactDamage(): number {
+    return this.damage;
+  }
+
+  setInContactThisFrame(value: boolean) {
+    this.inContactThisFrame = value;
+  }
+
+  wasInContactThisFrame(): boolean {
+    return this.inContactThisFrame;
   }
 
   applyContactPoison(strong: boolean) {
@@ -553,10 +628,19 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
   }
 
   shouldSplitOnDeath(): boolean {
-    return (this.flags & CreatureFlags.SPLIT_ON_DEATH) !== 0 && this.splitSize > 35;
+    return (
+      (this.flags & CreatureFlags.SPLIT_ON_DEATH) !== 0 && this.splitSize > 35
+    );
   }
 
-  getSplitChildren(): { health: number; size: number; speed: number; damage: number; xp: number; heading: number }[] {
+  getSplitChildren(): {
+    health: number;
+    size: number;
+    speed: number;
+    damage: number;
+    xp: number;
+    heading: number;
+  }[] {
     if (!this.shouldSplitOnDeath()) return [];
 
     const children = [];
@@ -564,10 +648,10 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
       children.push({
         health: this.maxHealth * 0.25,
         size: this.splitSize - 8.0,
-        speed: this.speed * 1.1,
+        speed: this.speed + 0.1,
         damage: this.damage * 0.7,
-        xp: Math.floor(this.xpValue * 2 / 3),
-        heading: wrapAngle(this.heading + headingOffset)
+        xp: Math.floor((this.xpValue * 2) / 3),
+        heading: wrapAngle(this.heading + headingOffset),
       });
     }
     return children;
@@ -598,12 +682,12 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
         scaleX: this.scaleX * 0.5,
         scaleY: this.scaleY * 0.5,
         duration: 250,
-        ease: 'Power2',
+        ease: "Power2",
         onComplete: () => {
           this.setActive(false);
           this.setVisible(false);
           this.shadow.destroy();
-        }
+        },
       });
     });
   }

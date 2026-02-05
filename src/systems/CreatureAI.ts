@@ -219,7 +219,8 @@ export function updateCreatureAITarget(
 }
 
 export function wrapAngle(angle: number): number {
-  return ((angle + Math.PI) % (Math.PI * 2)) - Math.PI;
+  const tau = Math.PI * 2;
+  return (((angle + Math.PI) % tau) + tau) % tau - Math.PI;
 }
 
 export function angleApproach(current: number, target: number, rate: number, dt: number): number {
