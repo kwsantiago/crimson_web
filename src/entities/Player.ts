@@ -267,7 +267,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   private updateMuzzleFlash(dt: number) {
     if (this.muzzleFlashAlpha > 0) {
-      const offset = (this.muzzleFlashAlpha * 12.0 - 21.0) * this.PLAYER_SCALE;
+      const offset = 24.0 * this.PLAYER_SCALE;
       this.muzzleFlash.setPosition(
         this.x + Math.cos(this.aimAngle) * offset,
         this.y + Math.sin(this.aimAngle) * offset

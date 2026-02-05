@@ -249,19 +249,14 @@ export class MenuScene extends Phaser.Scene {
     const posX = UI.MENU.LABEL_BASE_X - entry.slot * 20;
     const posY = entry.y;
 
-    const itemOffsetX = -71;
-    const itemOffsetY = -59;
     const itemW = 342;
     const itemH = 64;
+    const textOffsetX = -71 + itemW / 2 + 150;
 
-    const spriteLeft = posX + itemOffsetX;
-    const spriteTop = posY + itemOffsetY;
+    const left = posX + textOffsetX - 120;
+    const top = posY - itemH / 2;
 
-    const left = Math.max(0, spriteLeft);
-    const right = spriteLeft + itemW;
-    const w = right - left;
-
-    return { x: left, y: spriteTop, w, h: itemH };
+    return { x: left, y: top, w: 240, h: itemH };
   }
 
   private getAngle(slot: number): number {
@@ -450,8 +445,8 @@ export class MenuScene extends Phaser.Scene {
       }
 
       const alpha = entry.enabled
-        ? (100 + (entry.hoverAmount * 155) / 1000) / 255
-        : 0.3;
+        ? (180 + (entry.hoverAmount * 75) / 1000) / 255
+        : 0.4;
 
       const baseColor = entry.enabled ? UI.COLORS.MENU_ITEM : 0x666666;
       const r = ((baseColor >> 16) & 0xff);
