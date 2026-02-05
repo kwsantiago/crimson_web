@@ -13,7 +13,7 @@ import { BitmapFont } from '../ui/BitmapFont';
 import { SoundManager } from '../audio/SoundManager';
 import { smallFontWidths } from './BootScene';
 import { GameMode, GAME_MODE_CONFIGS } from '../data/gameModes';
-import { CreatureType } from '../data/creatures';
+import { CreatureType, getCorpseFrame } from '../data/creatures';
 import { PerkId } from '../data/perks';
 import { ProjectileType, WEAPONS } from '../data/weapons';
 import {
@@ -997,15 +997,19 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    const reflexPerkScale = this.player.perkManager.hasReflexBoosted() ? 0.9 : 1.0;
+    const reflexBonusScale = this.player.hasActiveReflex() ? 0.35 : 1.0;
+    const enemyTimeScale = reflexPerkScale * reflexBonusScale;
+
     this.creatures.getChildren().forEach((creature) => {
       const c = creature as Creature;
       if (c.active) {
-        c.update(delta, this.player);
+        c.update(delta * enemyTimeScale, this.player);
       }
     });
 
     this.bonusManager.update(delta);
-    this.updateEnemyProjectiles(delta);
+    this.updateEnemyProjectiles(delta, enemyTimeScale);
     this.spawnManager.update(delta, this.player.level);
     this.updatePerkEffects(delta / 1000);
     this.updateCameraShake(delta / 1000);
@@ -1226,14 +1230,22 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private updateEnemyProjectiles(delta: number) {
+  private updateEnemyProjectiles(delta: number, timeScale: number) {
     this.enemyProjectiles.getChildren().forEach((proj) => {
       const p = proj as Phaser.Physics.Arcade.Sprite;
       if (p.active) {
+        const body = p.body as Phaser.Physics.Arcade.Body;
+        if (body) {
+          const data = p.getData('baseVelocity') as { x: number; y: number } | undefined;
+          if (!data) {
+            p.setData('baseVelocity', { x: body.velocity.x, y: body.velocity.y });
+          } else {
+            body.setVelocity(data.x * timeScale, data.y * timeScale);
+          }
+        }
         if (p.x < 0 || p.x > WORLD_WIDTH || p.y < 0 || p.y > WORLD_HEIGHT) {
           p.setActive(false);
           p.setVisible(false);
-          const body = p.body as Phaser.Physics.Arcade.Body;
           if (body) body.enable = false;
         }
       }
@@ -1636,39 +1648,27 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnCorpse(x: number, y: number, creatureType: CreatureType) {
-    let frame = 0;
+    const frame = getCorpseFrame(creatureType);
     let sizeScale = 1.0;
 
-    if (this.textures.exists('bodyset_sheet')) {
-      switch (creatureType) {
-        case CreatureType.ZOMBIE:
-        case CreatureType.BIG_ZOMBIE:
-          frame = Math.floor(Math.random() * 4);
-          sizeScale = creatureType === CreatureType.BIG_ZOMBIE ? 1.5 : 1.0;
-          break;
-        case CreatureType.ALIEN:
-        case CreatureType.ALIEN_BOSS:
-          frame = 4 + Math.floor(Math.random() * 4);
-          sizeScale = creatureType === CreatureType.ALIEN_BOSS ? 1.8 : 1.0;
-          break;
-        case CreatureType.LIZARD:
-          frame = 8 + Math.floor(Math.random() * 4);
-          break;
-        case CreatureType.SPIDER:
-        case CreatureType.BABY_SPIDER:
-        case CreatureType.SPIDER_MOTHER:
-          frame = 12 + Math.floor(Math.random() * 4);
-          sizeScale = creatureType === CreatureType.SPIDER_MOTHER ? 1.8 :
-                      creatureType === CreatureType.BABY_SPIDER ? 0.5 : 0.7;
-          break;
-        case CreatureType.BOSS:
-          frame = Math.floor(Math.random() * 4);
-          sizeScale = 1.5;
-          break;
-        default:
-          frame = Math.floor(Math.random() * 16);
-      }
+    switch (creatureType) {
+      case CreatureType.BIG_ZOMBIE:
+      case CreatureType.BOSS:
+        sizeScale = 1.5;
+        break;
+      case CreatureType.ALIEN_BOSS:
+      case CreatureType.SPIDER_MOTHER:
+        sizeScale = 1.8;
+        break;
+      case CreatureType.BABY_SPIDER:
+        sizeScale = 0.5;
+        break;
+      case CreatureType.SPIDER:
+        sizeScale = 0.7;
+        break;
+    }
 
+    if (this.textures.exists('bodyset_sheet')) {
       const corpse = this.add.sprite(x, y, 'bodyset_sheet', frame);
       corpse.setDepth(2);
       corpse.setRotation(Math.random() * Math.PI * 2);
@@ -1690,10 +1690,6 @@ export class GameScene extends Phaser.Scene {
       corpse.setDepth(2);
       corpse.setRotation(Math.random() * Math.PI * 2);
       corpse.setAlpha(0.7);
-
-      sizeScale = creatureType === CreatureType.BIG_ZOMBIE || creatureType === CreatureType.BOSS ? 1.5 :
-                  creatureType === CreatureType.SPIDER || creatureType === CreatureType.BABY_SPIDER ? 0.5 :
-                  creatureType === CreatureType.SPIDER_MOTHER || creatureType === CreatureType.ALIEN_BOSS ? 1.8 : 1.0;
       corpse.setScale(sizeScale * (0.8 + Math.random() * 0.4));
 
       this.bloodDecals.add(corpse);

@@ -1,3 +1,12 @@
+export enum CreatureTypeId {
+  ZOMBIE = 0,
+  LIZARD = 1,
+  ALIEN = 2,
+  SPIDER_SP1 = 3,
+  SPIDER_SP2 = 4,
+  TROOPER = 5
+}
+
 export enum CreatureType {
   ZOMBIE = 'zombie',
   FAST_ZOMBIE = 'fast_zombie',
@@ -12,6 +21,36 @@ export enum CreatureType {
   LIZARD_SPITTER = 'lizard_spitter',
   NEST = 'nest',
   BOSS = 'boss'
+}
+
+export const CREATURE_TYPE_TO_ID: Record<CreatureType, CreatureTypeId> = {
+  [CreatureType.ZOMBIE]: CreatureTypeId.ZOMBIE,
+  [CreatureType.FAST_ZOMBIE]: CreatureTypeId.ZOMBIE,
+  [CreatureType.BIG_ZOMBIE]: CreatureTypeId.ZOMBIE,
+  [CreatureType.SPIDER]: CreatureTypeId.SPIDER_SP1,
+  [CreatureType.BABY_SPIDER]: CreatureTypeId.SPIDER_SP1,
+  [CreatureType.SPIDER_MOTHER]: CreatureTypeId.SPIDER_SP2,
+  [CreatureType.ALIEN]: CreatureTypeId.ALIEN,
+  [CreatureType.ALIEN_ELITE]: CreatureTypeId.ALIEN,
+  [CreatureType.ALIEN_BOSS]: CreatureTypeId.ALIEN,
+  [CreatureType.LIZARD]: CreatureTypeId.LIZARD,
+  [CreatureType.LIZARD_SPITTER]: CreatureTypeId.LIZARD,
+  [CreatureType.NEST]: CreatureTypeId.ZOMBIE,
+  [CreatureType.BOSS]: CreatureTypeId.ZOMBIE
+};
+
+export const CREATURE_CORPSE_FRAMES: Record<CreatureTypeId, number> = {
+  [CreatureTypeId.ZOMBIE]: 0,
+  [CreatureTypeId.LIZARD]: 3,
+  [CreatureTypeId.ALIEN]: 4,
+  [CreatureTypeId.SPIDER_SP1]: 1,
+  [CreatureTypeId.SPIDER_SP2]: 2,
+  [CreatureTypeId.TROOPER]: 7
+};
+
+export function getCorpseFrame(creatureType: CreatureType): number {
+  const typeId = CREATURE_TYPE_TO_ID[creatureType];
+  return CREATURE_CORPSE_FRAMES[typeId] ?? 0;
 }
 
 export interface CreatureData {

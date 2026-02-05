@@ -412,6 +412,10 @@ export class PerkManager {
     return this.hasPerk(PerkId.TELEKINETIC);
   }
 
+  hasReflexBoosted(): boolean {
+    return this.hasPerk(PerkId.REFLEX_BOOSTED);
+  }
+
   getBonusDurationMultiplier(): number {
     if (this.hasPerk(PerkId.BONUS_ECONOMIST)) {
       return this.highlander ? 3.0 : 1.5;

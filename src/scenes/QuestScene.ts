@@ -592,15 +592,19 @@ export class QuestScene extends Phaser.Scene {
 
     this.processSpawnQueue();
 
+    const reflexPerkScale = this.player.perkManager.hasReflexBoosted() ? 0.9 : 1.0;
+    const reflexBonusScale = this.player.hasActiveReflex() ? 0.35 : 1.0;
+    const enemyTimeScale = reflexPerkScale * reflexBonusScale;
+
     this.creatures.getChildren().forEach((creature) => {
       const c = creature as Creature;
       if (c.active) {
-        c.update(delta, this.player);
+        c.update(delta * enemyTimeScale, this.player);
       }
     });
 
     this.bonusManager.update(delta);
-    this.updateEnemyProjectiles(delta);
+    this.updateEnemyProjectiles(delta, enemyTimeScale);
     this.checkVictoryCondition();
     this.updateHUD();
   }
@@ -1192,11 +1196,27 @@ export class QuestScene extends Phaser.Scene {
     this.bloodDecals.add(decal);
   }
 
-  private updateEnemyProjectiles(delta: number) {
+  private updateEnemyProjectiles(delta: number, timeScale: number) {
     this.enemyProjectiles.getChildren().forEach((proj) => {
-      const p = proj as any;
-      if (p.active && p.update) {
-        p.update(delta);
+      const p = proj as Phaser.Physics.Arcade.Sprite;
+      if (p.active) {
+        const body = p.body as Phaser.Physics.Arcade.Body;
+        if (body) {
+          const data = p.getData('baseVelocity') as { x: number; y: number } | undefined;
+          if (!data) {
+            p.setData('baseVelocity', { x: body.velocity.x, y: body.velocity.y });
+          } else {
+            body.setVelocity(data.x * timeScale, data.y * timeScale);
+          }
+        }
+        if ((p as any).update) {
+          (p as any).update(delta * timeScale);
+        }
+        if (p.x < 0 || p.x > WORLD_WIDTH || p.y < 0 || p.y > WORLD_HEIGHT) {
+          p.setActive(false);
+          p.setVisible(false);
+          if (body) body.enable = false;
+        }
       }
     });
   }

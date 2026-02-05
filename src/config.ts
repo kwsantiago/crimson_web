@@ -70,7 +70,7 @@ export const UI = {
 
   MENU: {
     PANEL_WIDTH: 510,
-    PANEL_HEIGHT: 450,
+    PANEL_HEIGHT: 254,
     PANEL_OFFSET_X: 21,
     PANEL_OFFSET_Y: -81,
     PANEL_BASE_X: -45,
@@ -103,7 +103,7 @@ export const UI = {
     PANEL_X: -45,
     PANEL_Y: 210,
     PANEL_W: 512,
-    PANEL_H: 340,
+    PANEL_H: 256,
     PANEL_OFFSET_X: 20,
     PANEL_OFFSET_Y: -82,
     SLIDE_DURATION_MS: 250,

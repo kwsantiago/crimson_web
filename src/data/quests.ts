@@ -132,7 +132,7 @@ export const QUEST_DEFINITIONS: QuestDefinition[] = [
     description: 'Fast-moving targets appear from all directions. Test your aim!',
     timeLimitMs: 65000,
     startWeaponId: 1,
-    unlockPerkId: PerkId.URANIUM_BULLETS,
+    unlockPerkId: PerkId.URANIUM_FILLED_BULLETS,
     terrainTint: 0xb2b2b2,
     spawns: (() => {
       const entries: SpawnEntry[] = [];

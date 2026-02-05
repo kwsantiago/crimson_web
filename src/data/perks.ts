@@ -3,7 +3,7 @@ export enum PerkId {
   BLOODY_MESS_QUICK_LEARNER = 1,
   SHARPSHOOTER = 2,
   FASTLOADER = 3,
-  LEAN_MEAN_EXP = 4,
+  LEAN_MEAN_EXP_MACHINE = 4,
   LONG_DISTANCE_RUNNER = 5,
   PYROKINETIC = 6,
   INSTANT_WINNER = 7,
@@ -12,57 +12,68 @@ export enum PerkId {
   PLAGUEBEARER = 10,
   EVIL_EYES = 11,
   AMMO_MANIAC = 12,
-  REGENERATION = 13,
-  GREATER_REGENERATION = 14,
-  FASTSHOT = 15,
-  DOCTOR = 16,
-  THICK_SKINNED = 17,
-  MY_FAVOURITE_WEAPON = 18,
-  MAN_BOMB = 19,
-  URANIUM_BULLETS = 20,
-  LIVING_FORTRESS = 21,
-  BONUS_MAGNET = 22,
-  JINXED = 23,
-  MONSTER_VISION = 24,
-  PYROMANIAC = 25,
-  ION_GUN_MASTER = 26,
-  BARREL_GREASER = 27,
-  FATAL_LOTTERY = 28,
-  BREATHING_ROOM = 29,
-  LIFELINE_50_50 = 30,
-  RANDOM_WEAPON = 31,
-  INFERNAL_CONTRACT = 32,
-  DEATH_CLOCK = 33,
-  BANDAGE = 34,
-  HOT_TEMPERED = 35,
-  FIRE_COUGH = 36,
-  STATIONARY_RELOADER = 37,
-  ANGRY_RELOADER = 38,
-  ANXIOUS_LOADER = 39,
-  PERK_EXPERT = 40,
-  PERK_MASTER = 41,
-  RADIOACTIVE = 42,
-  REFLEX_BOOSTED = 43,
-  BONUS_ECONOMIST = 44,
-  AMMUNITION_WITHIN = 45,
-  POISON_BULLETS = 46,
-  REGRESSION_BULLETS = 47,
-  HIGHLANDER = 48,
-  VEINS_OF_POISON = 49,
-  TOXIC_AVENGER = 50,
-  DODGER = 51,
-  NINJA = 52,
-  TOUGH_RELOADER = 53,
-  MR_MELEE = 54,
-  UNSTOPPABLE = 55,
-  FINAL_REVENGE = 56,
-  TELEKINETIC = 57
+  RADIOACTIVE = 13,
+  FASTSHOT = 14,
+  FATAL_LOTTERY = 15,
+  RANDOM_WEAPON = 16,
+  MR_MELEE = 17,
+  ANXIOUS_LOADER = 18,
+  FINAL_REVENGE = 19,
+  TELEKINETIC = 20,
+  PERK_EXPERT = 21,
+  UNSTOPPABLE = 22,
+  REGRESSION_BULLETS = 23,
+  INFERNAL_CONTRACT = 24,
+  POISON_BULLETS = 25,
+  DODGER = 26,
+  BONUS_MAGNET = 27,
+  URANIUM_FILLED_BULLETS = 28,
+  DOCTOR = 29,
+  MONSTER_VISION = 30,
+  HOT_TEMPERED = 31,
+  BONUS_ECONOMIST = 32,
+  THICK_SKINNED = 33,
+  BARREL_GREASER = 34,
+  AMMUNITION_WITHIN = 35,
+  VEINS_OF_POISON = 36,
+  TOXIC_AVENGER = 37,
+  REGENERATION = 38,
+  PYROMANIAC = 39,
+  NINJA = 40,
+  HIGHLANDER = 41,
+  JINXED = 42,
+  PERK_MASTER = 43,
+  REFLEX_BOOSTED = 44,
+  GREATER_REGENERATION = 45,
+  BREATHING_ROOM = 46,
+  DEATH_CLOCK = 47,
+  MY_FAVOURITE_WEAPON = 48,
+  BANDAGE = 49,
+  ANGRY_RELOADER = 50,
+  ION_GUN_MASTER = 51,
+  STATIONARY_RELOADER = 52,
+  MAN_BOMB = 53,
+  FIRE_COUGH = 54,
+  LIVING_FORTRESS = 55,
+  TOUGH_RELOADER = 56,
+  LIFELINE_50_50 = 57,
+
+  // Aliases for backwards compatibility
+  LEAN_MEAN_EXP = 4,
+  URANIUM_BULLETS = 28
+}
+
+export enum PerkFlags {
+  MODE_3_ONLY = 0x1,
+  TWO_PLAYER_ONLY = 0x2,
+  STACKABLE = 0x4
 }
 
 export interface PerkData {
   id: PerkId;
   name: string;
   description: string;
+  flags: PerkFlags | null;
   maxStacks: number;
 }
 
@@ -70,349 +81,407 @@ export const PERKS: Record<PerkId, PerkData> = {
   [PerkId.ANTIPERK]: {
     id: PerkId.ANTIPERK,
     name: 'AntiPerk',
-    description: 'You should not see this',
+    description: "You shouldn't be seeing this..",
+    flags: null,
     maxStacks: 1
   },
   [PerkId.BLOODY_MESS_QUICK_LEARNER]: {
     id: PerkId.BLOODY_MESS_QUICK_LEARNER,
     name: 'Bloody Mess',
-    description: 'More blood and 30% more experience points.',
+    description: "More the merrier. More blood guarantees a 30% better experience. You spill more blood and gain more experience points.",
+    flags: null,
     maxStacks: 1
   },
   [PerkId.SHARPSHOOTER]: {
     id: PerkId.SHARPSHOOTER,
     name: 'Sharpshooter',
-    description: '50% less weapon spread',
-    maxStacks: 3
+    description: "Miraculously your aiming improves drastically, but you take a little bit more time on actually firing the gun. If you order now, you also get a fancy LASER SIGHT without ANY charge!",
+    flags: null,
+    maxStacks: 1
   },
   [PerkId.FASTLOADER]: {
     id: PerkId.FASTLOADER,
     name: 'Fastloader',
-    description: '25% faster reload speed',
-    maxStacks: 3
+    description: "Man, you sure know how to load a gun.",
+    flags: null,
+    maxStacks: 1
   },
-  [PerkId.LEAN_MEAN_EXP]: {
-    id: PerkId.LEAN_MEAN_EXP,
+  [PerkId.LEAN_MEAN_EXP_MACHINE]: {
+    id: PerkId.LEAN_MEAN_EXP_MACHINE,
     name: 'Lean Mean Exp Machine',
-    description: '+10 XP per second passively',
-    maxStacks: 5
+    description: "Why kill for experience when you can make some of your own for free! With this perk the experience just keeps flowing in at a constant rate.",
+    flags: null,
+    maxStacks: 1
   },
   [PerkId.LONG_DISTANCE_RUNNER]: {
     id: PerkId.LONG_DISTANCE_RUNNER,
     name: 'Long Distance Runner',
-    description: '+50% movement speed',
+    description: "You move like a train that has feet and runs. You just need a little time to warm up. In other words you'll move faster the longer you run without stopping.",
+    flags: null,
     maxStacks: 1
   },
   [PerkId.PYROKINETIC]: {
     id: PerkId.PYROKINETIC,
     name: 'Pyrokinetic',
-    description: 'Fire aura damages nearby enemies',
-    maxStacks: 3
+    description: "You see flames everywhere. Bare aiming at creatures causes them to heat up.",
+    flags: null,
+    maxStacks: 1
   },
   [PerkId.INSTANT_WINNER]: {
     id: PerkId.INSTANT_WINNER,
     name: 'Instant Winner',
-    description: 'Gain 2500 XP immediately',
+    description: "2500 experience points. Right away. Take it or leave it.",
+    flags: PerkFlags.STACKABLE,
     maxStacks: 99
   },
   [PerkId.GRIM_DEAL]: {
     id: PerkId.GRIM_DEAL,
     name: 'Grim Deal',
-    description: 'Trade 25% max health for +5000 XP',
-    maxStacks: 3
+    description: "I'll make you a deal: I'll give you 18% more experience points, and you'll give me your life. So you'll die but score higher. Ponder that one for a sec.",
+    flags: null,
+    maxStacks: 1
   },
   [PerkId.ALTERNATE_WEAPON]: {
     id: PerkId.ALTERNATE_WEAPON,
     name: 'Alternate Weapon',
-    description: 'Carry a second weapon (press Q to swap)',
+    description: "Ever fancied about having two weapons available for use? This might be your lucky day; with this perk you'll get an extra weapon slot for another gun! Carrying around two guns slows you down slightly though. (You can switch the weapon slots with RELOAD key)",
+    flags: PerkFlags.MODE_3_ONLY,
     maxStacks: 1
   },
   [PerkId.PLAGUEBEARER]: {
     id: PerkId.PLAGUEBEARER,
     name: 'Plaguebearer',
-    description: 'Poison enemies that get close to you',
-    maxStacks: 3
+    description: "You carry a horrible disease. Good for you: you are immune. Bad for them: it is contagious! (Monsters become resistant over time though.)",
+    flags: null,
+    maxStacks: 1
   },
   [PerkId.EVIL_EYES]: {
     id: PerkId.EVIL_EYES,
     name: 'Evil Eyes',
-    description: 'Damage enemies by looking at them',
-    maxStacks: 3
+    description: "No living (nor dead) can resist the hypnotic power of your eyes: monsters freeze still as you look at them!",
+    flags: null,
+    maxStacks: 1
   },
   [PerkId.AMMO_MANIAC]: {
     id: PerkId.AMMO_MANIAC,
     name: 'Ammo Maniac',
-    description: '+50% ammo capacity',
-    maxStacks: 2
-  },
-  [PerkId.REGENERATION]: {
-    id: PerkId.REGENERATION,
-    name: 'Regeneration',
-    description: 'Slowly regenerate health',
-    maxStacks: 1
-  },
-  [PerkId.GREATER_REGENERATION]: {
-    id: PerkId.GREATER_REGENERATION,
-    name: 'Greater Regeneration',
-    description: 'Faster health regeneration',
-    maxStacks: 1
-  },
-  [PerkId.FASTSHOT]: {
-    id: PerkId.FASTSHOT,
-    name: 'Fastshot',
-    description: '+25% fire rate',
-    maxStacks: 3
-  },
-  [PerkId.DOCTOR]: {
-    id: PerkId.DOCTOR,
-    name: 'Doctor',
-    description: 'Heal 1% of fire damage dealt',
-    maxStacks: 3
-  },
-  [PerkId.THICK_SKINNED]: {
-    id: PerkId.THICK_SKINNED,
-    name: 'Thick Skinned',
-    description: 'Take 33% less damage',
-    maxStacks: 1
-  },
-  [PerkId.MY_FAVOURITE_WEAPON]: {
-    id: PerkId.MY_FAVOURITE_WEAPON,
-    name: 'My Favourite Weapon',
-    description: 'Keep your current weapon forever',
-    maxStacks: 1
-  },
-  [PerkId.MAN_BOMB]: {
-    id: PerkId.MAN_BOMB,
-    name: 'Man Bomb',
-    description: 'Explode on death, then respawn once',
-    maxStacks: 1
-  },
-  [PerkId.URANIUM_BULLETS]: {
-    id: PerkId.URANIUM_BULLETS,
-    name: 'Uranium Filled Bullets',
-    description: '+25% bullet damage',
-    maxStacks: 3
-  },
-  [PerkId.LIVING_FORTRESS]: {
-    id: PerkId.LIVING_FORTRESS,
-    name: 'Living Fortress',
-    description: "Can't move, but massive damage resist",
-    maxStacks: 1
-  },
-  [PerkId.BONUS_MAGNET]: {
-    id: PerkId.BONUS_MAGNET,
-    name: 'Bonus Magnet',
-    description: 'Pickups are attracted to you',
-    maxStacks: 1
-  },
-  [PerkId.JINXED]: {
-    id: PerkId.JINXED,
-    name: 'Jinxed',
-    description: 'Random bad effects, but more XP',
-    maxStacks: 1
-  },
-  [PerkId.MONSTER_VISION]: {
-    id: PerkId.MONSTER_VISION,
-    name: 'Monster Vision',
-    description: 'See enemies through the fog',
-    maxStacks: 1
-  },
-  [PerkId.PYROMANIAC]: {
-    id: PerkId.PYROMANIAC,
-    name: 'Pyromaniac',
-    description: '+50% fire damage',
-    maxStacks: 1
-  },
-  [PerkId.ION_GUN_MASTER]: {
-    id: PerkId.ION_GUN_MASTER,
-    name: 'Ion Gun Master',
-    description: '+50% ion weapon damage',
-    maxStacks: 1
-  },
-  [PerkId.BARREL_GREASER]: {
-    id: PerkId.BARREL_GREASER,
-    name: 'Barrel Greaser',
-    description: 'Weapons never jam',
-    maxStacks: 1
-  },
-  [PerkId.FATAL_LOTTERY]: {
-    id: PerkId.FATAL_LOTTERY,
-    name: 'Fatal Lottery',
-    description: '50% chance: +10000 XP or instant death',
-    maxStacks: 1
-  },
-  [PerkId.BREATHING_ROOM]: {
-    id: PerkId.BREATHING_ROOM,
-    name: 'Breathing Room',
-    description: 'Freeze all enemies for 10 seconds',
-    maxStacks: 99
-  },
-  [PerkId.LIFELINE_50_50]: {
-    id: PerkId.LIFELINE_50_50,
-    name: 'Lifeline 50/50',
-    description: 'Kill half enemies, or lose half health',
-    maxStacks: 99
-  },
-  [PerkId.RANDOM_WEAPON]: {
-    id: PerkId.RANDOM_WEAPON,
-    name: 'Random Weapon',
-    description: 'Get a random weapon',
-    maxStacks: 99
-  },
-  [PerkId.INFERNAL_CONTRACT]: {
-    id: PerkId.INFERNAL_CONTRACT,
-    name: 'Infernal Contract',
-    description: '+3 levels, but health drops to 1',
-    maxStacks: 1
-  },
-  [PerkId.DEATH_CLOCK]: {
-    id: PerkId.DEATH_CLOCK,
-    name: 'Death Clock',
-    description: 'No healing, but +100% damage',
-    maxStacks: 1
-  },
-  [PerkId.BANDAGE]: {
-    id: PerkId.BANDAGE,
-    name: 'Bandage',
-    description: 'Heal 25% health immediately',
-    maxStacks: 99
-  },
-  [PerkId.HOT_TEMPERED]: {
-    id: PerkId.HOT_TEMPERED,
-    name: 'Hot Tempered',
-    description: 'More damage when health is low',
-    maxStacks: 1
-  },
-  [PerkId.FIRE_COUGH]: {
-    id: PerkId.FIRE_COUGH,
-    name: 'Fire Cough',
-    description: 'Occasionally shoot fireballs when hit',
-    maxStacks: 1
-  },
-  [PerkId.STATIONARY_RELOADER]: {
-    id: PerkId.STATIONARY_RELOADER,
-    name: 'Stationary Reloader',
-    description: 'Faster reload when not moving',
-    maxStacks: 1
-  },
-  [PerkId.ANGRY_RELOADER]: {
-    id: PerkId.ANGRY_RELOADER,
-    name: 'Angry Reloader',
-    description: 'Faster reload when surrounded',
-    maxStacks: 1
-  },
-  [PerkId.ANXIOUS_LOADER]: {
-    id: PerkId.ANXIOUS_LOADER,
-    name: 'Anxious Loader',
-    description: 'Auto-reload when not firing',
-    maxStacks: 1
-  },
-  [PerkId.PERK_EXPERT]: {
-    id: PerkId.PERK_EXPERT,
-    name: 'Perk Expert',
-    description: '5 perk choices instead of 4',
-    maxStacks: 1
-  },
-  [PerkId.PERK_MASTER]: {
-    id: PerkId.PERK_MASTER,
-    name: 'Perk Master',
-    description: '6 perk choices instead of 5',
+    description: "You squeeze and you push and you pack your clips with about 20% more ammo than a regular fellow. They call you Ammo Maniac with a deep respect in their voices.",
+    flags: null,
     maxStacks: 1
   },
   [PerkId.RADIOACTIVE]: {
     id: PerkId.RADIOACTIVE,
     name: 'Radioactive',
-    description: 'Damage aura around you',
-    maxStacks: 3
-  },
-  [PerkId.REFLEX_BOOSTED]: {
-    id: PerkId.REFLEX_BOOSTED,
-    name: 'Reflex Boosted',
-    description: 'Brief slow-mo when nearly hit',
+    description: "You are the Radioactive-man; you have that healthy green glow around you! Others don't like it though, it makes them sick and nauseous whenever near you. It does affect your social life a bit.",
+    flags: null,
     maxStacks: 1
   },
-  [PerkId.BONUS_ECONOMIST]: {
-    id: PerkId.BONUS_ECONOMIST,
-    name: 'Bonus Economist',
-    description: 'Bonuses last 50% longer',
+  [PerkId.FASTSHOT]: {
+    id: PerkId.FASTSHOT,
+    name: 'Fastshot',
+    description: "Funny how you make your gun spit bullets faster than the next guy. Even the most professional of engineers are astonished.",
+    flags: null,
     maxStacks: 1
   },
-  [PerkId.AMMUNITION_WITHIN]: {
-    id: PerkId.AMMUNITION_WITHIN,
-    name: 'Ammunition Within',
-    description: 'Never need to reload',
-    maxStacks: 1
+  [PerkId.FATAL_LOTTERY]: {
+    id: PerkId.FATAL_LOTTERY,
+    name: 'Fatal Lottery',
+    description: "Fifty-fifty chance of dying OR gaining 10k experience points. Place your bets. Interested, anyone?",
+    flags: PerkFlags.STACKABLE,
+    maxStacks: 99
   },
-  [PerkId.POISON_BULLETS]: {
-    id: PerkId.POISON_BULLETS,
-    name: 'Poison Bullets',
-    description: 'Bullets apply poison damage over time',
-    maxStacks: 1
-  },
-  [PerkId.REGRESSION_BULLETS]: {
-    id: PerkId.REGRESSION_BULLETS,
-    name: 'Regression Bullets',
-    description: 'Kills refund ammo',
-    maxStacks: 1
-  },
-  [PerkId.HIGHLANDER]: {
-    id: PerkId.HIGHLANDER,
-    name: 'Highlander',
-    description: 'Only one perk total, but 10x effective',
-    maxStacks: 1
-  },
-  [PerkId.VEINS_OF_POISON]: {
-    id: PerkId.VEINS_OF_POISON,
-    name: 'Veins of Poison',
-    description: 'Monsters taking a bite of you are eventually to experience an agonizing death.',
-    maxStacks: 1
-  },
-  [PerkId.TOXIC_AVENGER]: {
-    id: PerkId.TOXIC_AVENGER,
-    name: 'Toxic Avenger',
-    description: 'Most monsters touching you will just drop dead within seconds!',
-    maxStacks: 1
-  },
-  [PerkId.DODGER]: {
-    id: PerkId.DODGER,
-    name: 'Dodger',
-    description: 'Each time a monster attacks you have a chance to dodge the attack.',
-    maxStacks: 1
-  },
-  [PerkId.NINJA]: {
-    id: PerkId.NINJA,
-    name: 'Ninja',
-    description: 'Monsters have really hard time hitting you.',
-    maxStacks: 1
-  },
-  [PerkId.TOUGH_RELOADER]: {
-    id: PerkId.TOUGH_RELOADER,
-    name: 'Tough Reloader',
-    description: 'Damage received during reloading a weapon is halved.',
-    maxStacks: 1
+  [PerkId.RANDOM_WEAPON]: {
+    id: PerkId.RANDOM_WEAPON,
+    name: 'Random Weapon',
+    description: "Here, have this weapon. No questions asked.",
+    flags: PerkFlags.MODE_3_ONLY | PerkFlags.STACKABLE,
+    maxStacks: 99
   },
   [PerkId.MR_MELEE]: {
     id: PerkId.MR_MELEE,
     name: 'Mr. Melee',
-    description: 'You hit back when monsters come near. Hard.',
+    description: "You master the art of melee fighting. You don't just stand still when monsters come near -- you hit back. Hard.",
+    flags: null,
     maxStacks: 1
   },
-  [PerkId.UNSTOPPABLE]: {
-    id: PerkId.UNSTOPPABLE,
-    name: 'Unstoppable',
-    description: 'Monsters cannot slow you down with their attacks.',
+  [PerkId.ANXIOUS_LOADER]: {
+    id: PerkId.ANXIOUS_LOADER,
+    name: 'Anxious Loader',
+    description: "When you can't stand waiting your gun to be reloaded you can speed up the process by clicking your FIRE button repeatedly as fast as you can.",
+    flags: null,
     maxStacks: 1
   },
   [PerkId.FINAL_REVENGE]: {
     id: PerkId.FINAL_REVENGE,
     name: 'Final Revenge',
-    description: 'Pick this and you will get your revenge. It is a promise.',
+    description: "Pick this and you'll get your revenge. It's a promise.",
+    flags: null,
     maxStacks: 1
   },
   [PerkId.TELEKINETIC]: {
     id: PerkId.TELEKINETIC,
     name: 'Telekinetic',
-    description: 'Pick up bonuses by aiming at them.',
+    description: "Picking up bonuses has never been so easy and FUN. You can pick up bonuses simply by aiming at them for a while. Ingenious.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.PERK_EXPERT]: {
+    id: PerkId.PERK_EXPERT,
+    name: 'Perk Expert',
+    description: "You sure know how to pick a perk -- most people just don't see that extra perk laying around. This gives you the opportunity to pick the freshest and shiniest perks from the top.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.UNSTOPPABLE]: {
+    id: PerkId.UNSTOPPABLE,
+    name: 'Unstoppable',
+    description: "Monsters can't slow you down with their nasty scratches and bites. It still hurts but you simply ignore the pain.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.REGRESSION_BULLETS]: {
+    id: PerkId.REGRESSION_BULLETS,
+    name: 'Regression Bullets',
+    description: "Attempt to shoot with an empty clip leads to a severe loss of experience. But hey, whatever makes them go down, right?",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.INFERNAL_CONTRACT]: {
+    id: PerkId.INFERNAL_CONTRACT,
+    name: 'Infernal Contract',
+    description: "In exchange for your soul, a dark stranger is offering you three (3) new perks. To collect his part of the bargain soon enough, your health is reduced to a near-death status. Just sign down here below this pentagram..",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.POISON_BULLETS]: {
+    id: PerkId.POISON_BULLETS,
+    name: 'Poison Bullets',
+    description: "You tend to explicitly treat each of your bullets with rat poison. You do it for good luck, but it seems to have other side effects too.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.DODGER]: {
+    id: PerkId.DODGER,
+    name: 'Dodger',
+    description: "It seems so stupid just to take the hits. Each time a monster attacks you you have a chance to dodge the attack.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.BONUS_MAGNET]: {
+    id: PerkId.BONUS_MAGNET,
+    name: 'Bonus Magnet',
+    description: "You somehow seem to lure all kinds of bonuses to appear around you more often.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.URANIUM_FILLED_BULLETS]: {
+    id: PerkId.URANIUM_FILLED_BULLETS,
+    name: 'Uranium Filled Bullets',
+    description: "Your bullets have a nice creamy uranium filling. Yummy. Now that's gotta hurt the monsters more, right?",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.DOCTOR]: {
+    id: PerkId.DOCTOR,
+    name: 'Doctor',
+    description: "With a single glance you can tell the medical condition of, well, anything. Also, being a doctor, you know exactly what hurts the most enabling you to do slightly more damage with your attacks.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.MONSTER_VISION]: {
+    id: PerkId.MONSTER_VISION,
+    name: 'Monster Vision',
+    description: "With your newly enhanced senses you can see all bad energy VERY clearly. That's got to be enough.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.HOT_TEMPERED]: {
+    id: PerkId.HOT_TEMPERED,
+    name: 'Hot Tempered',
+    description: "It literally boils inside you. That's exactly why you need to let it out once in a while, unfortunately for those near you.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.BONUS_ECONOMIST]: {
+    id: PerkId.BONUS_ECONOMIST,
+    name: 'Bonus Economist',
+    description: "Your bonus power-ups last 50% longer than they normally would.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.THICK_SKINNED]: {
+    id: PerkId.THICK_SKINNED,
+    name: 'Thick Skinned',
+    description: "Trade 1/3 of your health for only receiving 2/3rds damage on attacks.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.BARREL_GREASER]: {
+    id: PerkId.BARREL_GREASER,
+    name: 'Barrel Greaser',
+    description: "After studying a lot of physics and friction you've come up with a way to make your bullets fly faster. More speed, more damage.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.AMMUNITION_WITHIN]: {
+    id: PerkId.AMMUNITION_WITHIN,
+    name: 'Ammunition Within',
+    description: "Empty clip doesn't prevent you from shooting with a weapon; instead the ammunition is drawn from your health while you are reloading.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.VEINS_OF_POISON]: {
+    id: PerkId.VEINS_OF_POISON,
+    name: 'Veins of Poison',
+    description: "A strong poison runs through your veins. Monsters taking a bite of you are eventually to experience an agonizing death.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.TOXIC_AVENGER]: {
+    id: PerkId.TOXIC_AVENGER,
+    name: 'Toxic Avenger',
+    description: "You started out just by being poisonous. The next logical step for you is to become highly toxic -- the ULTIMATE TOXIC AVENGER. Most monsters touching you will just drop dead within seconds!",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.REGENERATION]: {
+    id: PerkId.REGENERATION,
+    name: 'Regeneration',
+    description: "Your health replenishes but very slowly. What more there is to say?",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.PYROMANIAC]: {
+    id: PerkId.PYROMANIAC,
+    name: 'Pyromaniac',
+    description: "You just enjoy using fire as your Tool of Destruction and you're good at it too; your fire based weapons do a lot more damage.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.NINJA]: {
+    id: PerkId.NINJA,
+    name: 'Ninja',
+    description: "You've taken your dodging abilities to the next level; monsters have really hard time hitting you.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.HIGHLANDER]: {
+    id: PerkId.HIGHLANDER,
+    name: 'Highlander',
+    description: "You are immortal. Well, almost immortal. Instead of actually losing health on attacks you've got a 10% chance of just dropping dead whenever a monster attacks you. There really can be only one, you know.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.JINXED]: {
+    id: PerkId.JINXED,
+    name: 'Jinxed',
+    description: "Things happen near you. Strangest things. Creatures just drop dead and accidents happen. Beware.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.PERK_MASTER]: {
+    id: PerkId.PERK_MASTER,
+    name: 'Perk Master',
+    description: "Being the Perk Expert taught you a few things and now you are ready to take your training to the next level doubling the ability effect.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.REFLEX_BOOSTED]: {
+    id: PerkId.REFLEX_BOOSTED,
+    name: 'Reflex Boosted',
+    description: "To you the world seems to go on about 10% slower than to an average person. It can be rather irritating sometimes, but it does give you a chance to react better.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.GREATER_REGENERATION]: {
+    id: PerkId.GREATER_REGENERATION,
+    name: 'Greater Regeneration',
+    description: "Your health replenishes faster than ever.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.BREATHING_ROOM]: {
+    id: PerkId.BREATHING_ROOM,
+    name: 'Breathing Room',
+    description: "Trade 2/3rds of your health for the killing of every single creature on the screen. No, you don't get the experience.",
+    flags: PerkFlags.TWO_PLAYER_ONLY,
+    maxStacks: 1
+  },
+  [PerkId.DEATH_CLOCK]: {
+    id: PerkId.DEATH_CLOCK,
+    name: 'Death Clock',
+    description: "You die exactly in 30 seconds. You can't escape your destiny, but feel free to go on a spree. Tick, tock.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.MY_FAVOURITE_WEAPON]: {
+    id: PerkId.MY_FAVOURITE_WEAPON,
+    name: 'My Favourite Weapon',
+    description: "You've grown very fond of your piece. You polish it all the time and talk nice to it, your precious. (+2 clip size, no more random weapon bonuses)",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.BANDAGE]: {
+    id: PerkId.BANDAGE,
+    name: 'Bandage',
+    description: "Here, eat this bandage and you'll feel a lot better in no time. (restores up to 50% health)",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.ANGRY_RELOADER]: {
+    id: PerkId.ANGRY_RELOADER,
+    name: 'Angry Reloader',
+    description: "You hate it when you run out of shots. You HATE HATE HATE reloading your gun. Lucky for you, and strangely enough, your hate materializes as Mighty Balls of Fire. Or more like Quite Decent Balls of Fire, but it's still kinda neat, huh?",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.ION_GUN_MASTER]: {
+    id: PerkId.ION_GUN_MASTER,
+    name: 'Ion Gun Master',
+    description: "You're good with ion weapons. You're so good that not only your shots do slightly more damage but your ion blast radius is also increased.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.STATIONARY_RELOADER]: {
+    id: PerkId.STATIONARY_RELOADER,
+    name: 'Stationary Reloader',
+    description: "It's incredibly hard to reload your piece while moving around, you've noticed. In fact, realizing that, when you don't move a (leg) muscle you can reload the gun THREE TIMES FASTER!",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.MAN_BOMB]: {
+    id: PerkId.MAN_BOMB,
+    name: 'Man Bomb',
+    description: "You have the ability to go boom for you are the MAN BOMB. Going boom requires a lot of concentration and standing completely still for a few seconds.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.FIRE_COUGH]: {
+    id: PerkId.FIRE_COUGH,
+    name: 'Fire Cough',
+    description: "You have a fireball stuck in your throat. Repeatedly. Mind your manners.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.LIVING_FORTRESS]: {
+    id: PerkId.LIVING_FORTRESS,
+    name: 'Living Fortress',
+    description: "It comes a time in each man's life when you'd just rather not move anymore. Being living fortress not moving comes with extra benefits as well. You do the more damage the longer you stand still.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.TOUGH_RELOADER]: {
+    id: PerkId.TOUGH_RELOADER,
+    name: 'Tough Reloader',
+    description: "Damage received during reloading a weapon is halved.",
+    flags: null,
+    maxStacks: 1
+  },
+  [PerkId.LIFELINE_50_50]: {
+    id: PerkId.LIFELINE_50_50,
+    name: 'Lifeline 50-50',
+    description: "The computer removes half of the wrong monsters for you. You don't gain any experience.",
+    flags: null,
     maxStacks: 1
   }
 };
@@ -421,56 +490,60 @@ export const AVAILABLE_PERKS: PerkId[] = [
   PerkId.BLOODY_MESS_QUICK_LEARNER,
   PerkId.SHARPSHOOTER,
   PerkId.FASTLOADER,
-  PerkId.LEAN_MEAN_EXP,
+  PerkId.LEAN_MEAN_EXP_MACHINE,
   PerkId.LONG_DISTANCE_RUNNER,
   PerkId.PYROKINETIC,
   PerkId.INSTANT_WINNER,
   PerkId.GRIM_DEAL,
+  PerkId.ALTERNATE_WEAPON,
   PerkId.PLAGUEBEARER,
   PerkId.EVIL_EYES,
   PerkId.AMMO_MANIAC,
-  PerkId.REGENERATION,
-  PerkId.GREATER_REGENERATION,
-  PerkId.FASTSHOT,
-  PerkId.DOCTOR,
-  PerkId.THICK_SKINNED,
-  PerkId.MY_FAVOURITE_WEAPON,
-  PerkId.MAN_BOMB,
-  PerkId.URANIUM_BULLETS,
-  PerkId.BONUS_MAGNET,
-  PerkId.PYROMANIAC,
-  PerkId.ION_GUN_MASTER,
-  PerkId.FATAL_LOTTERY,
-  PerkId.BREATHING_ROOM,
-  PerkId.LIFELINE_50_50,
-  PerkId.RANDOM_WEAPON,
-  PerkId.INFERNAL_CONTRACT,
-  PerkId.DEATH_CLOCK,
-  PerkId.BANDAGE,
-  PerkId.HOT_TEMPERED,
-  PerkId.FIRE_COUGH,
-  PerkId.STATIONARY_RELOADER,
-  PerkId.ANGRY_RELOADER,
-  PerkId.ANXIOUS_LOADER,
-  PerkId.PERK_EXPERT,
-  PerkId.PERK_MASTER,
   PerkId.RADIOACTIVE,
-  PerkId.REFLEX_BOOSTED,
-  PerkId.BONUS_ECONOMIST,
-  PerkId.AMMUNITION_WITHIN,
-  PerkId.POISON_BULLETS,
-  PerkId.REGRESSION_BULLETS,
-  PerkId.HIGHLANDER,
-  PerkId.VEINS_OF_POISON,
-  PerkId.TOXIC_AVENGER,
-  PerkId.DODGER,
-  PerkId.NINJA,
-  PerkId.TOUGH_RELOADER,
+  PerkId.FASTSHOT,
+  PerkId.FATAL_LOTTERY,
+  PerkId.RANDOM_WEAPON,
   PerkId.MR_MELEE,
-  PerkId.UNSTOPPABLE,
+  PerkId.ANXIOUS_LOADER,
   PerkId.FINAL_REVENGE,
   PerkId.TELEKINETIC,
-  PerkId.LIVING_FORTRESS
+  PerkId.PERK_EXPERT,
+  PerkId.UNSTOPPABLE,
+  PerkId.REGRESSION_BULLETS,
+  PerkId.INFERNAL_CONTRACT,
+  PerkId.POISON_BULLETS,
+  PerkId.DODGER,
+  PerkId.BONUS_MAGNET,
+  PerkId.URANIUM_FILLED_BULLETS,
+  PerkId.DOCTOR,
+  PerkId.MONSTER_VISION,
+  PerkId.HOT_TEMPERED,
+  PerkId.BONUS_ECONOMIST,
+  PerkId.THICK_SKINNED,
+  PerkId.BARREL_GREASER,
+  PerkId.AMMUNITION_WITHIN,
+  PerkId.VEINS_OF_POISON,
+  PerkId.TOXIC_AVENGER,
+  PerkId.REGENERATION,
+  PerkId.PYROMANIAC,
+  PerkId.NINJA,
+  PerkId.HIGHLANDER,
+  PerkId.JINXED,
+  PerkId.PERK_MASTER,
+  PerkId.REFLEX_BOOSTED,
+  PerkId.GREATER_REGENERATION,
+  PerkId.BREATHING_ROOM,
+  PerkId.DEATH_CLOCK,
+  PerkId.MY_FAVOURITE_WEAPON,
+  PerkId.BANDAGE,
+  PerkId.ANGRY_RELOADER,
+  PerkId.ION_GUN_MASTER,
+  PerkId.STATIONARY_RELOADER,
+  PerkId.MAN_BOMB,
+  PerkId.FIRE_COUGH,
+  PerkId.LIVING_FORTRESS,
+  PerkId.TOUGH_RELOADER,
+  PerkId.LIFELINE_50_50
 ];
 
 export const PERK_PREREQUISITES: Partial<Record<PerkId, PerkId>> = {
@@ -482,4 +555,9 @@ export const PERK_PREREQUISITES: Partial<Record<PerkId, PerkId>> = {
 
 export function getPerkData(id: PerkId): PerkData {
   return PERKS[id];
+}
+
+export function isStackable(id: PerkId): boolean {
+  const perk = PERKS[id];
+  return perk?.flags !== null && (perk.flags & PerkFlags.STACKABLE) !== 0;
 }

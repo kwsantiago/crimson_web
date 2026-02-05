@@ -23,7 +23,7 @@ const TUTORIAL_WORLD_SIZE = 1024;
 
 const TUTORIAL_STAGE_TEXT = [
   "In this tutorial you'll learn how to play Crimsonland",
-  "First learn to move by pushing WASD.",
+  "First learn to move by pushing the arrow keys.",
   "Now pick up the bonuses by walking over them",
   "Now learn to shoot and move at the same time.\nClick the left Mouse button to shoot.",
   "Now, move the mouse to aim at the monsters",
@@ -37,7 +37,7 @@ const TUTORIAL_HINT_TEXT = [
   "This is the speed powerup, it makes you move faster!",
   "This is a weapon powerup. Picking it up gives you a new weapon.",
   "This powerup doubles all experience points you gain while it's active.",
-  "This is the nuke powerup, picking it up causes a huge\nexplosion harming all monsters nearby!",
+  "This is the nuke powerup, picking it up causes a huge\nexposion harming all monsters nearby!",
   "Reflex Boost powerup slows down time giving you a chance to react better",
   "",
   "",
