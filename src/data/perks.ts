@@ -1,6 +1,6 @@
 export enum PerkId {
   ANTIPERK = 0,
-  BLOODY_MESS = 1,
+  BLOODY_MESS_QUICK_LEARNER = 1,
   SHARPSHOOTER = 2,
   FASTLOADER = 3,
   LEAN_MEAN_EXP = 4,
@@ -47,7 +47,16 @@ export enum PerkId {
   AMMUNITION_WITHIN = 45,
   POISON_BULLETS = 46,
   REGRESSION_BULLETS = 47,
-  HIGHLANDER = 48
+  HIGHLANDER = 48,
+  VEINS_OF_POISON = 49,
+  TOXIC_AVENGER = 50,
+  DODGER = 51,
+  NINJA = 52,
+  TOUGH_RELOADER = 53,
+  MR_MELEE = 54,
+  UNSTOPPABLE = 55,
+  FINAL_REVENGE = 56,
+  TELEKINETIC = 57
 }
 
 export interface PerkData {
@@ -64,10 +73,10 @@ export const PERKS: Record<PerkId, PerkData> = {
     description: 'You should not see this',
     maxStacks: 1
   },
-  [PerkId.BLOODY_MESS]: {
-    id: PerkId.BLOODY_MESS,
+  [PerkId.BLOODY_MESS_QUICK_LEARNER]: {
+    id: PerkId.BLOODY_MESS_QUICK_LEARNER,
     name: 'Bloody Mess',
-    description: 'More blood effects when enemies die',
+    description: 'More blood and 30% more experience points.',
     maxStacks: 1
   },
   [PerkId.SHARPSHOOTER]: {
@@ -351,11 +360,65 @@ export const PERKS: Record<PerkId, PerkData> = {
     name: 'Highlander',
     description: 'Only one perk total, but 10x effective',
     maxStacks: 1
+  },
+  [PerkId.VEINS_OF_POISON]: {
+    id: PerkId.VEINS_OF_POISON,
+    name: 'Veins of Poison',
+    description: 'Monsters taking a bite of you are eventually to experience an agonizing death.',
+    maxStacks: 1
+  },
+  [PerkId.TOXIC_AVENGER]: {
+    id: PerkId.TOXIC_AVENGER,
+    name: 'Toxic Avenger',
+    description: 'Most monsters touching you will just drop dead within seconds!',
+    maxStacks: 1
+  },
+  [PerkId.DODGER]: {
+    id: PerkId.DODGER,
+    name: 'Dodger',
+    description: 'Each time a monster attacks you have a chance to dodge the attack.',
+    maxStacks: 1
+  },
+  [PerkId.NINJA]: {
+    id: PerkId.NINJA,
+    name: 'Ninja',
+    description: 'Monsters have really hard time hitting you.',
+    maxStacks: 1
+  },
+  [PerkId.TOUGH_RELOADER]: {
+    id: PerkId.TOUGH_RELOADER,
+    name: 'Tough Reloader',
+    description: 'Damage received during reloading a weapon is halved.',
+    maxStacks: 1
+  },
+  [PerkId.MR_MELEE]: {
+    id: PerkId.MR_MELEE,
+    name: 'Mr. Melee',
+    description: 'You hit back when monsters come near. Hard.',
+    maxStacks: 1
+  },
+  [PerkId.UNSTOPPABLE]: {
+    id: PerkId.UNSTOPPABLE,
+    name: 'Unstoppable',
+    description: 'Monsters cannot slow you down with their attacks.',
+    maxStacks: 1
+  },
+  [PerkId.FINAL_REVENGE]: {
+    id: PerkId.FINAL_REVENGE,
+    name: 'Final Revenge',
+    description: 'Pick this and you will get your revenge. It is a promise.',
+    maxStacks: 1
+  },
+  [PerkId.TELEKINETIC]: {
+    id: PerkId.TELEKINETIC,
+    name: 'Telekinetic',
+    description: 'Pick up bonuses by aiming at them.',
+    maxStacks: 1
   }
 };
 
 export const AVAILABLE_PERKS: PerkId[] = [
-  PerkId.BLOODY_MESS,
+  PerkId.BLOODY_MESS_QUICK_LEARNER,
   PerkId.SHARPSHOOTER,
   PerkId.FASTLOADER,
   PerkId.LEAN_MEAN_EXP,
@@ -397,8 +460,25 @@ export const AVAILABLE_PERKS: PerkId[] = [
   PerkId.AMMUNITION_WITHIN,
   PerkId.POISON_BULLETS,
   PerkId.REGRESSION_BULLETS,
-  PerkId.HIGHLANDER
+  PerkId.HIGHLANDER,
+  PerkId.VEINS_OF_POISON,
+  PerkId.TOXIC_AVENGER,
+  PerkId.DODGER,
+  PerkId.NINJA,
+  PerkId.TOUGH_RELOADER,
+  PerkId.MR_MELEE,
+  PerkId.UNSTOPPABLE,
+  PerkId.FINAL_REVENGE,
+  PerkId.TELEKINETIC,
+  PerkId.LIVING_FORTRESS
 ];
+
+export const PERK_PREREQUISITES: Partial<Record<PerkId, PerkId>> = {
+  [PerkId.TOXIC_AVENGER]: PerkId.VEINS_OF_POISON,
+  [PerkId.NINJA]: PerkId.DODGER,
+  [PerkId.PERK_MASTER]: PerkId.PERK_EXPERT,
+  [PerkId.GREATER_REGENERATION]: PerkId.REGENERATION
+};
 
 export function getPerkData(id: PerkId): PerkData {
   return PERKS[id];

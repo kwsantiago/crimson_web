@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { PerkId, getPerkData } from '../data/perks';
 import { PerkManager } from '../systems/PerkManager';
+import { SoundManager } from '../audio/SoundManager';
 import { SCREEN_WIDTH, SCREEN_HEIGHT, UI } from '../config';
 
 function easeOutCubic(t: number): number {
@@ -49,10 +50,12 @@ export class PerkSelector {
   private clickHandled: boolean = false;
   private descText!: Phaser.GameObjects.Text;
   private overlay!: Phaser.GameObjects.Rectangle;
+  private soundManager: SoundManager | null = null;
 
-  constructor(scene: Phaser.Scene, perkManager: PerkManager) {
+  constructor(scene: Phaser.Scene, perkManager: PerkManager, soundManager?: SoundManager) {
     this.scene = scene;
     this.perkManager = perkManager;
+    this.soundManager = soundManager ?? null;
     this.container = scene.add.container(0, 0);
     this.container.setDepth(1000);
     this.container.setScrollFactor(0);
@@ -148,6 +151,8 @@ export class PerkSelector {
     if (this.choices.length === 0) {
       return;
     }
+
+    this.soundManager?.playUiPanelClick();
 
     this.selectedIndex = 0;
     this.isVisible = true;
@@ -344,6 +349,8 @@ export class PerkSelector {
 
   private selectPerk(index: number) {
     if (index < 0 || index >= this.choices.length) return;
+
+    this.soundManager?.playPerkSelect();
 
     const perkId = this.choices[index];
     this.perkManager.applyPerk(perkId);

@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
 import { PaqArchive, decodeJaz, jazToCanvas, decodeTga, tgaToCanvas } from '../loaders/PaqLoader';
+import { SFX_ASSETS, SFX_BASE_PATH, MUSIC_PAQ_URL, MUSIC_TRACKS } from '../data/audio';
 
 const PAQ_URL = './crimson.paq';
 const CACHE_KEY = 'crimson_paq_v1';
+const MUSIC_CACHE_KEY = 'crimson_music_paq_v1';
 
 export let smallFontWidths: Uint8Array | null = null;
 
@@ -30,6 +32,12 @@ export class BootScene extends Phaser.Scene {
 
       this.loadingText.setText('Decoding textures...');
       await this.loadTexturesFromPaq(archive);
+
+      this.loadingText.setText('Loading audio...');
+      await this.loadAudio();
+
+      this.loadingText.setText('Loading music...');
+      await this.loadMusic();
 
       this.createAnimations();
       this.generateFallbackTextures();
@@ -261,6 +269,127 @@ export class BootScene extends Phaser.Scene {
     }
   }
 
+  private async loadAudio(): Promise<void> {
+    return new Promise((resolve) => {
+      const total = SFX_ASSETS.length;
+      let loaded = 0;
+
+      for (const asset of SFX_ASSETS) {
+        this.load.audio(asset.key, SFX_BASE_PATH + asset.file);
+      }
+
+      this.load.on('filecomplete', () => {
+        loaded++;
+        this.loadingText.setText(`Loading audio... ${loaded}/${total}`);
+      });
+
+      this.load.on('complete', () => {
+        this.loadingText.setText(`Loaded ${loaded} audio files`);
+        resolve();
+      });
+
+      this.load.on('loaderror', (file: Phaser.Loader.File) => {
+        console.warn(`Failed to load audio: ${file.key}`);
+      });
+
+      this.load.start();
+    });
+  }
+
+  private async loadMusic(): Promise<void> {
+    try {
+      const buffer = await this.fetchMusicWithCache();
+      const archive = PaqArchive.fromArrayBuffer(buffer);
+
+      const total = MUSIC_TRACKS.length;
+      let loaded = 0;
+
+      for (const track of MUSIC_TRACKS) {
+        const data = archive.get(track.file);
+        if (!data) {
+          console.warn(`Missing music track in PAQ: ${track.file}`);
+          continue;
+        }
+
+        const blob = new Blob([new Uint8Array(data)], { type: 'audio/ogg' });
+        const url = URL.createObjectURL(blob);
+
+        await new Promise<void>((resolve) => {
+          this.load.audio(track.key, url);
+          this.load.once('filecomplete-audio-' + track.key, () => {
+            loaded++;
+            this.loadingText.setText(`Loading music... ${loaded}/${total}`);
+            resolve();
+          });
+          this.load.once('loaderror', () => {
+            console.warn(`Failed to decode music: ${track.key}`);
+            resolve();
+          });
+          this.load.start();
+        });
+      }
+
+      this.loadingText.setText(`Loaded ${loaded} music tracks`);
+    } catch (error) {
+      console.warn('Failed to load music (non-fatal):', error);
+    }
+  }
+
+  private async fetchMusicWithCache(): Promise<ArrayBuffer> {
+    const cached = await this.getMusicFromCache();
+    if (cached) {
+      return cached;
+    }
+
+    const response = await fetch(MUSIC_PAQ_URL);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch music PAQ: ${response.statusText}`);
+    }
+    const buffer = await response.arrayBuffer();
+
+    this.saveMusicToCache(buffer);
+    return buffer;
+  }
+
+  private async getMusicFromCache(): Promise<ArrayBuffer | null> {
+    return new Promise((resolve) => {
+      const request = indexedDB.open('CrimsonCache', 1);
+      request.onerror = () => resolve(null);
+      request.onupgradeneeded = (e) => {
+        const db = (e.target as IDBOpenDBRequest).result;
+        if (!db.objectStoreNames.contains('assets')) {
+          db.createObjectStore('assets');
+        }
+      };
+      request.onsuccess = (e) => {
+        const db = (e.target as IDBOpenDBRequest).result;
+        try {
+          const tx = db.transaction('assets', 'readonly');
+          const store = tx.objectStore('assets');
+          const get = store.get(MUSIC_CACHE_KEY);
+          get.onsuccess = () => resolve(get.result || null);
+          get.onerror = () => resolve(null);
+        } catch {
+          resolve(null);
+        }
+      };
+    });
+  }
+
+  private saveMusicToCache(buffer: ArrayBuffer): void {
+    const request = indexedDB.open('CrimsonCache', 1);
+    request.onsuccess = (e) => {
+      const db = (e.target as IDBOpenDBRequest).result;
+      try {
+        const tx = db.transaction('assets', 'readwrite');
+        const store = tx.objectStore('assets');
+        store.put(buffer, MUSIC_CACHE_KEY);
+      } catch (err) {
+        console.warn('Failed to cache music PAQ:', err);
+      }
+    };
+  }
+
   private createAnimations() {
     this.anims.create({
       key: 'player_idle',
@@ -464,6 +593,58 @@ export class BootScene extends Phaser.Scene {
     graphics.fillStyle(0xff00ff, 1);
     graphics.fillCircle(14, 14, 12);
     graphics.generateTexture('bonus_reflex', 28, 28);
+    graphics.clear();
+
+    graphics.fillStyle(0xffdd00, 1);
+    graphics.fillCircle(14, 14, 12);
+    graphics.lineStyle(2, 0xffffff, 0.8);
+    graphics.strokeCircle(14, 14, 8);
+    graphics.generateTexture('bonus_double_xp', 28, 28);
+    graphics.clear();
+
+    graphics.fillStyle(0xff6600, 1);
+    graphics.fillCircle(14, 14, 12);
+    graphics.fillStyle(0xffff00, 1);
+    graphics.fillTriangle(14, 6, 8, 22, 20, 22);
+    graphics.generateTexture('bonus_power_up', 28, 28);
+    graphics.clear();
+
+    graphics.lineStyle(3, 0x8888ff, 1);
+    graphics.beginPath();
+    graphics.moveTo(4, 14);
+    graphics.lineTo(14, 4);
+    graphics.lineTo(24, 14);
+    graphics.lineTo(14, 24);
+    graphics.closePath();
+    graphics.strokePath();
+    graphics.generateTexture('bonus_shock', 28, 28);
+    graphics.clear();
+
+    graphics.fillStyle(0xff4400, 1);
+    graphics.fillCircle(14, 14, 12);
+    graphics.fillStyle(0xffaa00, 1);
+    graphics.fillCircle(14, 14, 8);
+    graphics.fillStyle(0xffff00, 1);
+    graphics.fillCircle(14, 14, 4);
+    graphics.generateTexture('bonus_fireblast', 28, 28);
+    graphics.clear();
+
+    graphics.fillStyle(0xff2200, 1);
+    graphics.fillCircle(14, 14, 12);
+    graphics.fillStyle(0xff8800, 1);
+    graphics.fillRect(10, 6, 8, 16);
+    graphics.generateTexture('bonus_fire_bullets', 28, 28);
+    graphics.clear();
+
+    graphics.fillStyle(0xffff00, 1);
+    graphics.fillCircle(14, 14, 12);
+    graphics.fillStyle(0x000000, 1);
+    graphics.fillCircle(10, 11, 3);
+    graphics.fillCircle(18, 11, 3);
+    graphics.beginPath();
+    graphics.arc(14, 16, 6, 0, Math.PI, false);
+    graphics.fillPath();
+    graphics.generateTexture('bonus_energizer', 28, 28);
     graphics.clear();
 
     graphics.destroy();

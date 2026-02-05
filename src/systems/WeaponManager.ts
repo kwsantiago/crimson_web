@@ -3,10 +3,17 @@ import { WEAPONS, WeaponData, getWeaponByIndex, ProjectileType } from '../data/w
 import { Projectile } from '../entities/Projectile';
 import { PerkManager } from './PerkManager';
 
+export interface BonusTimers {
+  weaponPowerUpTimer: number;
+  fireBulletsTimer: number;
+  healthPercent: number;
+}
+
 export class WeaponManager {
   private scene: Phaser.Scene;
   private projectiles: Phaser.Physics.Arcade.Group;
   private perkManager?: PerkManager;
+  private bonusTimers?: () => BonusTimers;
   private _currentWeaponIndex: number = 1;
   private ammo: number;
   private reloadTimer: number = 0;
@@ -68,13 +75,19 @@ export class WeaponManager {
 
   private getReloadTime(): number {
     const base = this.currentWeapon.reloadTime;
-    const multiplier = this.perkManager?.getReloadMultiplier() ?? 1.0;
+    let multiplier = this.perkManager?.getReloadMultiplier() ?? 1.0;
+    if (this.hasWeaponPowerUp()) {
+      multiplier *= 0.5;
+    }
     return base * multiplier;
   }
 
   private getFireRate(): number {
     const base = this.currentWeapon.fireRate;
-    const multiplier = this.perkManager?.getFireRateMultiplier() ?? 1.0;
+    let multiplier = this.perkManager?.getFireRateMultiplier() ?? 1.0;
+    if (this.hasWeaponPowerUp()) {
+      multiplier *= 0.5;
+    }
     return base * multiplier;
   }
 
@@ -86,17 +99,24 @@ export class WeaponManager {
 
   private getDamage(): number {
     const base = this.currentWeapon.damage;
-    const multiplier = this.perkManager?.getDamageMultiplier(this.currentWeapon.projectileType) ?? 1.0;
+    let multiplier = this.perkManager?.getDamageMultiplier(this.currentWeapon.projectileType) ?? 1.0;
+    multiplier *= this.perkManager?.getLivingFortressDamageMultiplier() ?? 1.0;
+    const healthPercent = this.bonusTimers ? this.bonusTimers().healthPercent : 1.0;
+    multiplier *= this.perkManager?.getHotTemperedMultiplier(healthPercent) ?? 1.0;
     return Math.floor(base * multiplier);
   }
 
-  update(delta: number) {
+  update(delta: number, isMoving: boolean = false, isFiring: boolean = false) {
     const dt = delta / 1000;
 
     this.shotCooldown = Math.max(0, this.shotCooldown - dt);
 
     if (this.isReloading) {
-      this.reloadTimer -= dt;
+      let reloadMultiplier = 1.0;
+      if (!isMoving && this.perkManager?.hasStationaryReloader()) {
+        reloadMultiplier = 3.0;
+      }
+      this.reloadTimer -= dt * reloadMultiplier;
       if (this.reloadTimer <= 0) {
         this.finishReload();
       }
@@ -115,6 +135,12 @@ export class WeaponManager {
           this.switchWeapon(weaponIndex);
         }
       }
+    }
+  }
+
+  triggerAutoReload() {
+    if (!this.isReloading && this.ammo < this.clipSize) {
+      this.startReload();
     }
   }
 
@@ -137,6 +163,8 @@ export class WeaponManager {
     const spread = this.getSpread();
     const damage = this.getDamage();
     const hasPoisonBullets = this.perkManager?.hasPoisonBullets() ?? false;
+    const useFireBullets = this.hasFireBullets();
+    const projectileType = useFireBullets ? ProjectileType.FLAME : weapon.projectileType;
 
     for (let i = 0; i < weapon.pelletCount; i++) {
       let spreadAngle = angle;
@@ -144,7 +172,7 @@ export class WeaponManager {
 
       const bullet = this.projectiles.get(x, y, 'bullet') as Projectile;
       if (bullet) {
-        bullet.fire(x, y, spreadAngle, weapon.projectileSpeed, damage, weapon.projectileType);
+        bullet.fire(x, y, spreadAngle, weapon.projectileSpeed, damage, projectileType);
         if (hasPoisonBullets) {
           bullet.isPoisoned = true;
         }
@@ -191,5 +219,17 @@ export class WeaponManager {
 
   refundAmmo(count: number = 1) {
     this.ammo = Math.min(this.clipSize, this.ammo + count);
+  }
+
+  setBonusTimers(getter: () => BonusTimers) {
+    this.bonusTimers = getter;
+  }
+
+  private hasWeaponPowerUp(): boolean {
+    return this.bonusTimers ? this.bonusTimers().weaponPowerUpTimer > 0 : false;
+  }
+
+  private hasFireBullets(): boolean {
+    return this.bonusTimers ? this.bonusTimers().fireBulletsTimer > 0 : false;
   }
 }

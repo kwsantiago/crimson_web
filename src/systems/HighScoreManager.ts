@@ -1,47 +1,79 @@
 import { GameMode } from '../data/gameModes';
 
 export interface HighScoreEntry {
+  name: string;
   score: number;
   kills: number;
   level: number;
   time: number;
   date: number;
+  accuracy?: number;
+  weaponId?: number;
   mode?: GameMode;
 }
 
 const STORAGE_KEY = 'crimsonland_highscores';
 const STORAGE_KEY_RUSH = 'crimsonland_highscores_rush';
+const STORAGE_KEY_TYPO = 'crimsonland_highscores_typo';
 const MAX_ENTRIES = 10;
 
 export class HighScoreManager {
-  private scores: Record<GameMode, HighScoreEntry[]> = {
+  private scores: Partial<Record<GameMode, HighScoreEntry[]>> = {
     [GameMode.SURVIVAL]: [],
-    [GameMode.RUSH]: []
+    [GameMode.RUSH]: [],
+    [GameMode.TYPO]: []
   };
 
   constructor() {
     this.load();
   }
 
+  private getScoresList(mode: GameMode): HighScoreEntry[] {
+    if (!this.scores[mode]) {
+      this.scores[mode] = [];
+    }
+    return this.scores[mode]!;
+  }
+
   private getStorageKey(mode: GameMode): string {
-    return mode === GameMode.RUSH ? STORAGE_KEY_RUSH : STORAGE_KEY;
+    if (mode === GameMode.RUSH) return STORAGE_KEY_RUSH;
+    if (mode === GameMode.TYPO) return STORAGE_KEY_TYPO;
+    return STORAGE_KEY;
   }
 
   private load() {
     try {
       const survivalData = localStorage.getItem(STORAGE_KEY);
       if (survivalData) {
-        this.scores[GameMode.SURVIVAL] = JSON.parse(survivalData);
+        const parsed = JSON.parse(survivalData);
+        this.scores[GameMode.SURVIVAL] = parsed.map((e: any) => ({
+          name: e.name || '',
+          ...e
+        }));
       }
 
       const rushData = localStorage.getItem(STORAGE_KEY_RUSH);
       if (rushData) {
-        this.scores[GameMode.RUSH] = JSON.parse(rushData);
+        const parsed = JSON.parse(rushData);
+        this.scores[GameMode.RUSH] = parsed.map((e: any) => ({
+          name: e.name || '',
+          ...e
+        }));
+      }
+
+      const typoData = localStorage.getItem(STORAGE_KEY_TYPO);
+      if (typoData) {
+        const parsed = JSON.parse(typoData);
+        this.scores[GameMode.TYPO] = parsed.map((e: any) => ({
+          name: e.name || '',
+          ...e
+        }));
       }
     } catch {
       this.scores = {
         [GameMode.SURVIVAL]: [],
-        [GameMode.RUSH]: []
+        [GameMode.RUSH]: [],
+        [GameMode.TYPO]: []
       };
     }
   }
@@ -50,31 +82,59 @@ export class HighScoreManager {
     try {
       const key = this.getStorageKey(mode);
       localStorage.setItem(key, JSON.stringify(this.scores[mode]));
-    } catch {
-    }
+    } catch {}
   }
 
-  addScore(kills: number, level: number, timeMs: number, mode: GameMode = GameMode.SURVIVAL): { rank: number; isHighScore: boolean } {
+  addScore(
+    kills: number,
+    level: number,
+    timeMs: number,
+    mode: GameMode = GameMode.SURVIVAL,
+    name: string = '',
+    accuracy?: number,
+    weaponId?: number
+  ): { rank: number; isHighScore: boolean; entry: HighScoreEntry } {
     const score = this.calculateScore(kills, level, timeMs, mode);
     const entry: HighScoreEntry = {
+      name: name.trim().substring(0, 20),
       score,
       kills,
       level,
       time: timeMs,
       date: Date.now(),
+      accuracy,
+      weaponId,
       mode
     };
 
-    this.scores[mode].push(entry);
-    this.scores[mode].sort((a, b) => b.score - a.score);
-
-    const rank = this.scores[mode].indexOf(entry);
-    const isHighScore = rank < MAX_ENTRIES;
-
-    this.scores[mode] = this.scores[mode].slice(0, MAX_ENTRIES);
+    const scoresList = this.getScoresList(mode);
+    const insertIndex = this.findInsertIndex(mode, score);
+    scoresList.splice(insertIndex, 0, entry);
+    this.scores[mode] = scoresList.slice(0, MAX_ENTRIES);
     this.save(mode);
 
-    return { rank: rank + 1, isHighScore };
+    const rank = insertIndex;
+    const isHighScore = rank < MAX_ENTRIES;
+
+    return { rank, isHighScore, entry };
+  }
+
+  private findInsertIndex(mode: GameMode, score: number): number {
+    const scores = this.getScoresList(mode);
+    for (let i = 0; i < scores.length; i++) {
+      if (score > scores[i].score) {
+        return i;
+      }
+    }
+    return scores.length;
+  }
+
+  updateEntryName(mode: GameMode, rank: number, name: string) {
+    const scoresList = this.getScoresList(mode);
+    if (rank >= 0 && rank < scoresList.length) {
+      scoresList[rank].name = name.trim().substring(0, 20);
+      this.save(mode);
+    }
   }
 
   private calculateScore(kills: number, level: number, timeMs: number, mode: GameMode): number {
@@ -88,12 +148,26 @@ export class HighScoreManager {
     return baseScore;
   }
 
+  isNewHighScore(kills: number, level: number, timeMs: number, mode: GameMode): boolean {
+    const scoresList = this.getScoresList(mode);
+    const score = this.calculateScore(kills, level, timeMs, mode);
+    if (scoresList.length < MAX_ENTRIES) return true;
+    const lowestScore = scoresList[scoresList.length - 1]?.score || 0;
+    return score > lowestScore;
+  }
+
   getScores(mode: GameMode = GameMode.SURVIVAL): HighScoreEntry[] {
-    return [...this.scores[mode]];
+    return [...this.getScoresList(mode)];
   }
 
   getHighScore(mode: GameMode = GameMode.SURVIVAL): number {
-    return this.scores[mode].length > 0 ? this.scores[mode][0].score : 0;
+    const scoresList = this.getScoresList(mode);
+    return scoresList.length > 0 ? scoresList[0].score : 0;
+  }
+
+  getTopEntry(mode: GameMode = GameMode.SURVIVAL): HighScoreEntry | null {
+    const scoresList = this.getScoresList(mode);
+    return scoresList.length > 0 ? { ...scoresList[0] } : null;
   }
 
   clearScores(mode?: GameMode) {
@@ -103,10 +177,12 @@ export class HighScoreManager {
     } else {
       this.scores = {
         [GameMode.SURVIVAL]: [],
-        [GameMode.RUSH]: []
+        [GameMode.RUSH]: [],
+        [GameMode.TYPO]: []
       };
       this.save(GameMode.SURVIVAL);
       this.save(GameMode.RUSH);
+      this.save(GameMode.TYPO);
     }
   }
 
@@ -120,5 +196,9 @@ export class HighScoreManager {
   formatDate(timestamp: number): string {
     const date = new Date(timestamp);
     return date.toLocaleDateString();
+  }
+
+  formatScore(score: number): string {
+    return score.toLocaleString();
   }
 }

@@ -7,7 +7,10 @@ import { SpawnManager } from '../systems/SpawnManager';
 import { BonusManager } from '../systems/BonusManager';
 import { PerkSelector } from '../ui/PerkSelector';
 import { HighScoreManager } from '../systems/HighScoreManager';
+import { StatsManager } from '../systems/StatsManager';
+import { SaveManager } from '../systems/SaveManager';
 import { BitmapFont } from '../ui/BitmapFont';
+import { SoundManager } from '../audio/SoundManager';
 import { smallFontWidths } from './BootScene';
 import { GameMode, GAME_MODE_CONFIGS } from '../data/gameModes';
 import { CreatureType } from '../data/creatures';
@@ -92,6 +95,8 @@ export class GameScene extends Phaser.Scene {
   private bonusManager!: BonusManager;
   private perkSelector!: PerkSelector;
   private highScoreManager!: HighScoreManager;
+  private statsManager!: StatsManager;
+  private saveManager!: SaveManager;
   private bloodDecals!: Phaser.GameObjects.Group;
   private healthBar!: Phaser.GameObjects.Graphics;
   private xpBar!: Phaser.GameObjects.Graphics;
@@ -115,6 +120,7 @@ export class GameScene extends Phaser.Scene {
   private modeIndicator!: Phaser.GameObjects.Text;
   private hudScale: number = 1;
   private crosshair!: Phaser.GameObjects.Image;
+  private crosshairGlow!: Phaser.GameObjects.Image;
   private topBarSprite!: Phaser.GameObjects.Image;
   private heartSprite!: Phaser.GameObjects.Image;
   private healthBarBg!: Phaser.GameObjects.Image;
@@ -134,6 +140,23 @@ export class GameScene extends Phaser.Scene {
   private pauseButtonElements: Phaser.GameObjects.GameObject[] = [];
   private pauseClickHandled: boolean = false;
   private bitmapFont: BitmapFont | null = null;
+  private soundManager!: SoundManager;
+  private pyrokineticTimer: number = 0;
+  private radioactiveTimer: number = 0;
+  private plaguebearerTimer: number = 0;
+  private hotTemperedTimer: number = 0;
+  private evilEyesTimer: number = 0;
+  private manBombTriggered: boolean = false;
+  private manBombRespawnPending: boolean = false;
+  private nameInputActive: boolean = false;
+  private nameInputText: string = '';
+  private nameInputRank: number = -1;
+  private shotsFired: number = 0;
+  private shotsHit: number = 0;
+  private cameraShakePulses: number = 0;
+  private cameraShakeTimer: number = 0;
+  private cameraShakeOffsetX: number = 0;
+  private cameraShakeOffsetY: number = 0;
 
   constructor() {
     super('GameScene');
@@ -149,10 +172,20 @@ export class GameScene extends Phaser.Scene {
     this.pendingPerks = 0;
     this.rightWasDown = false;
     this.gameStartTime = Date.now();
+    this.nameInputActive = false;
+    this.nameInputText = '';
+    this.nameInputRank = -1;
+    this.shotsFired = 0;
+    this.shotsHit = 0;
 
     this.game.canvas.oncontextmenu = (e) => e.preventDefault();
 
     this.highScoreManager = new HighScoreManager();
+    this.statsManager = new StatsManager();
+    this.saveManager = new SaveManager();
+    this.soundManager = new SoundManager(this);
+
+    this.saveManager.incrementModePlayCount(this.gameMode);
 
     if (this.textures.exists('smallFont') && smallFontWidths) {
       this.bitmapFont = new BitmapFont(this, 'smallFont', smallFontWidths);
@@ -213,10 +246,13 @@ export class GameScene extends Phaser.Scene {
     this.bonusManager = new BonusManager(this, this.bonuses, this.player);
     this.bonusManager.setCallbacks({
       onNuke: () => this.nukeAllEnemies(),
-      onFreeze: (duration) => this.freezeAllEnemies(duration)
+      onFreeze: (duration) => this.freezeAllEnemies(duration),
+      onShockChain: () => this.triggerShockChain(),
+      onFireblast: () => this.triggerFireblast(),
+      onEnergizer: (duration) => this.triggerEnergizer(duration)
     });
 
-    this.perkSelector = new PerkSelector(this, this.player.perkManager);
+    this.perkSelector = new PerkSelector(this, this.player.perkManager, this.soundManager);
     this.perkSelector.setCallback((perkId) => {
       this.pendingPerks--;
       if (this.pendingPerks > 0) {
@@ -268,6 +304,9 @@ export class GameScene extends Phaser.Scene {
     if (this.crosshair) {
       this.crosshair.setVisible(false);
     }
+    if (this.crosshairGlow) {
+      this.crosshairGlow.setVisible(false);
+    }
   }
 
   private hidePauseMenu() {
@@ -282,6 +321,9 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.crosshair) {
       this.crosshair.setVisible(true);
+    }
+    if (this.crosshairGlow) {
+      this.crosshairGlow.setVisible(true);
     }
   }
 
@@ -615,11 +657,19 @@ export class GameScene extends Phaser.Scene {
     this.powerupIcons.setScrollFactor(0);
     this.powerupIcons.setDepth(100);
 
+    if (this.textures.exists('particles_sheet')) {
+      this.crosshairGlow = this.add.image(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 'particles_sheet', 13);
+      this.crosshairGlow.setScrollFactor(0);
+      this.crosshairGlow.setDepth(499);
+      this.crosshairGlow.setDisplaySize(64, 64);
+      this.crosshairGlow.setBlendMode(Phaser.BlendModes.ADD);
+    }
+
     if (this.textures.exists('ui_aim')) {
       this.crosshair = this.add.image(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 'ui_aim');
       this.crosshair.setScrollFactor(0);
       this.crosshair.setDepth(500);
-      this.crosshair.setScale(this.hudScale);
+      this.crosshair.setDisplaySize(20, 20);
     }
 
     this.input.setDefaultCursor('none');
@@ -700,6 +750,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     const pointer = this.input.activePointer;
+    if (this.crosshairGlow) {
+      this.crosshairGlow.setPosition(pointer.x, pointer.y);
+    }
     if (this.crosshair) {
       this.crosshair.setPosition(pointer.x, pointer.y);
     }
@@ -798,6 +851,31 @@ export class GameScene extends Phaser.Scene {
     if (this.player.hasActiveReflex()) {
       const icon = this.add.sprite(14, y, 'bonus_reflex');
       drawBonusSlot(icon, 'Reflex', this.player.reflexBoostTimer, 0xff00ff);
+      y += spacing;
+    }
+
+    if (this.player.hasActiveDoubleXp()) {
+      const icon = this.add.sprite(14, y, 'bonus_double_xp');
+      drawBonusSlot(icon, '2x XP', this.player.doubleXpTimer, 0xffdd00);
+      y += spacing;
+    }
+
+    if (this.player.hasActiveWeaponPowerUp()) {
+      const icon = this.add.sprite(14, y, 'bonus_power_up');
+      drawBonusSlot(icon, 'Power Up', this.player.weaponPowerUpTimer, 0xff6600);
+      y += spacing;
+    }
+
+    if (this.player.hasActiveFireBullets()) {
+      const icon = this.add.sprite(14, y, 'bonus_fire_bullets');
+      drawBonusSlot(icon, 'Fire Ammo', this.player.fireBulletsTimer, 0xff4400);
+      y += spacing;
+    }
+
+    if (this.player.hasActiveEnergizer()) {
+      const icon = this.add.sprite(14, y, 'bonus_energizer');
+      drawBonusSlot(icon, 'Energizer', this.player.energizerTimer, 0xffff00);
+      y += spacing;
     }
   }
 
@@ -825,6 +903,9 @@ export class GameScene extends Phaser.Scene {
     if (this.menuCursor) {
       this.menuCursor.setPosition(pointer.x, pointer.y);
     }
+    if (this.crosshairGlow) {
+      this.crosshairGlow.setPosition(pointer.x, pointer.y);
+    }
     if (this.crosshair) {
       this.crosshair.setPosition(pointer.x, pointer.y);
     }
@@ -836,6 +917,9 @@ export class GameScene extends Phaser.Scene {
       if (this.crosshair) {
         this.crosshair.setVisible(false);
       }
+      if (this.crosshairGlow) {
+        this.crosshairGlow.setVisible(false);
+      }
       return;
     }
 
@@ -846,6 +930,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.elapsedMs += delta;
+    this.soundManager.update();
 
     if (this.perkSelector.isOpen()) {
       this.physics.pause();
@@ -857,7 +942,10 @@ export class GameScene extends Phaser.Scene {
       if (this.crosshair) {
         this.crosshair.setVisible(false);
       }
-      return; // Game is paused while perk menu is open
+      if (this.crosshairGlow) {
+        this.crosshairGlow.setVisible(false);
+      }
+      return;
     }
 
     if (this.physics.world.isPaused) {
@@ -869,6 +957,9 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.crosshair) {
       this.crosshair.setVisible(true);
+    }
+    if (this.crosshairGlow) {
+      this.crosshairGlow.setVisible(true);
     }
 
     const rightDown = pointer.rightButtonDown();
@@ -887,6 +978,21 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (this.player.health <= 0) {
+      if (this.player.perkManager.hasFinalRevenge()) {
+        this.triggerFinalRevenge();
+      }
+
+      if (this.player.perkManager.useManBomb() && !this.manBombTriggered) {
+        this.manBombTriggered = true;
+        this.triggerManBombExplosion();
+        return;
+      }
+
+      if (this.manBombRespawnPending) {
+        this.manBombRespawnPending = false;
+        return;
+      }
+
       this.handleGameOver();
       return;
     }
@@ -901,7 +1007,223 @@ export class GameScene extends Phaser.Scene {
     this.bonusManager.update(delta);
     this.updateEnemyProjectiles(delta);
     this.spawnManager.update(delta, this.player.level);
+    this.updatePerkEffects(delta / 1000);
+    this.updateCameraShake(delta / 1000);
     this.updateHUD();
+  }
+
+  private startCameraShake(pulses: number, timer: number) {
+    this.cameraShakePulses = pulses;
+    this.cameraShakeTimer = timer;
+  }
+
+  private updateCameraShake(dt: number) {
+    if (this.cameraShakeTimer <= 0) {
+      this.cameraShakeOffsetX = 0;
+      this.cameraShakeOffsetY = 0;
+      return;
+    }
+
+    this.cameraShakeTimer -= dt * 3.0;
+    if (this.cameraShakeTimer >= 0) {
+      return;
+    }
+
+    this.cameraShakePulses--;
+    if (this.cameraShakePulses < 1) {
+      this.cameraShakeTimer = 0;
+      this.cameraShakeOffsetX = 0;
+      this.cameraShakeOffsetY = 0;
+      return;
+    }
+
+    const timeScaleActive = this.player.reflexBoostTimer > 0;
+    this.cameraShakeTimer = timeScaleActive ? 0.06 : 0.1;
+
+    const maxAmp = this.cameraShakePulses * 3;
+    if (maxAmp <= 0) {
+      this.cameraShakeOffsetX = 0;
+      this.cameraShakeOffsetY = 0;
+      this.cameraShakeTimer = 0;
+      this.cameraShakePulses = 0;
+      return;
+    }
+
+    const rand = () => Math.floor(Math.random() * 0x7FFFFFFF);
+    let magX = (rand() % maxAmp) + (rand() % 10);
+    if ((rand() & 1) === 0) magX = -magX;
+    this.cameraShakeOffsetX = magX;
+
+    let magY = (rand() % maxAmp) + (rand() % 10);
+    if ((rand() & 1) === 0) magY = -magY;
+    this.cameraShakeOffsetY = magY;
+
+    const cam = this.cameras.main;
+    cam.scrollX += this.cameraShakeOffsetX;
+    cam.scrollY += this.cameraShakeOffsetY;
+  }
+
+  private updatePerkEffects(dt: number) {
+    const pm = this.player.perkManager;
+
+    const pyrokineticDamage = pm.getPyrokineticDamage();
+    if (pyrokineticDamage > 0) {
+      this.pyrokineticTimer += dt;
+      if (this.pyrokineticTimer >= 0.5) {
+        this.pyrokineticTimer = 0;
+        const aimWorld = this.cameras.main.getWorldPoint(
+          this.input.activePointer.x,
+          this.input.activePointer.y
+        );
+        this.creatures.getChildren().forEach((c) => {
+          const creature = c as Creature;
+          if (!creature.active || creature.health <= 0) return;
+          const dx = creature.x - aimWorld.x;
+          const dy = creature.y - aimWorld.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 48) {
+            const killed = creature.takeDamage(pyrokineticDamage);
+            if (killed) this.onCreatureKilled(creature);
+            this.spawnFireEffect(creature.x, creature.y);
+          }
+        });
+      }
+    }
+
+    const radioactiveDamage = pm.getRadioactiveDamage();
+    if (radioactiveDamage > 0) {
+      this.radioactiveTimer += dt;
+      if (this.radioactiveTimer >= 0.5) {
+        this.radioactiveTimer = 0;
+        this.creatures.getChildren().forEach((c) => {
+          const creature = c as Creature;
+          if (!creature.active || creature.health <= 0) return;
+          const dx = creature.x - this.player.x;
+          const dy = creature.y - this.player.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 100) {
+            const damage = (100 - dist) * 0.3 * (radioactiveDamage / 3);
+            const killed = creature.takeDamage(damage);
+            if (killed) this.onCreatureKilled(creature);
+          }
+        });
+      }
+    }
+
+    const plagueDamage = pm.getPlaguebearerDamage();
+    if (plagueDamage > 0) {
+      this.plaguebearerTimer += dt;
+      if (this.plaguebearerTimer >= 0.5) {
+        this.plaguebearerTimer = 0;
+        this.creatures.getChildren().forEach((c) => {
+          const creature = c as Creature;
+          if (!creature.active || creature.health <= 0) return;
+          const dx = creature.x - this.player.x;
+          const dy = creature.y - this.player.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 30 && creature.health < 150) {
+            creature.applyPlague(plagueDamage);
+          }
+        });
+      }
+    }
+
+    if (pm.hasHotTempered()) {
+      this.hotTemperedTimer += dt;
+      if (this.hotTemperedTimer >= 5.0) {
+        this.hotTemperedTimer = 0;
+        this.spawnHotTemperedRing();
+      }
+    }
+
+    if (this.player.consumeFireCough()) {
+      this.spawnFireCoughProjectile();
+    }
+
+    const evilEyesDamage = pm.getEvilEyesDamage();
+    if (evilEyesDamage > 0) {
+      this.evilEyesTimer += dt;
+      if (this.evilEyesTimer >= 0.25) {
+        this.evilEyesTimer = 0;
+        const aimWorld = this.cameras.main.getWorldPoint(
+          this.input.activePointer.x,
+          this.input.activePointer.y
+        );
+        this.creatures.getChildren().forEach((c) => {
+          const creature = c as Creature;
+          if (!creature.active || creature.health <= 0) return;
+          const dx = creature.x - aimWorld.x;
+          const dy = creature.y - aimWorld.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 64) {
+            const killed = creature.takeDamage(evilEyesDamage);
+            if (killed) this.onCreatureKilled(creature);
+          }
+        });
+      }
+    }
+
+    if (pm.hasTelekinetic()) {
+      const aimWorld = this.cameras.main.getWorldPoint(
+        this.input.activePointer.x,
+        this.input.activePointer.y
+      );
+      this.bonuses.getChildren().forEach((b) => {
+        const bonus = b as Bonus;
+        if (!bonus.active) return;
+        const dx = bonus.x - aimWorld.x;
+        const dy = bonus.y - aimWorld.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 80) {
+          const moveSpeed = 200 * dt;
+          const dirX = this.player.x - bonus.x;
+          const dirY = this.player.y - bonus.y;
+          const dirDist = Math.sqrt(dirX * dirX + dirY * dirY);
+          if (dirDist > 0) {
+            bonus.x += (dirX / dirDist) * moveSpeed;
+            bonus.y += (dirY / dirDist) * moveSpeed;
+          }
+        }
+      });
+    }
+  }
+
+  private spawnFireEffect(x: number, y: number) {
+    const gfx = this.add.graphics();
+    gfx.fillStyle(0xff6600, 0.6);
+    gfx.fillCircle(x, y, 8);
+    gfx.setDepth(15);
+    this.tweens.add({
+      targets: gfx,
+      alpha: 0,
+      scaleX: 2,
+      scaleY: 2,
+      duration: 300,
+      onComplete: () => gfx.destroy()
+    });
+  }
+
+  private spawnHotTemperedRing() {
+    const count = 8;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const proj = this.projectiles.get(this.player.x, this.player.y, 'bullet') as Projectile;
+      if (proj) {
+        const type = i % 2 === 0 ? ProjectileType.FLAME : ProjectileType.PLASMA;
+        proj.fire(this.player.x, this.player.y, angle, 300, 15, type);
+      }
+    }
+  }
+
+  private spawnFireCoughProjectile() {
+    const angle = this.player.getAimAngle();
+    for (let i = 0; i < 3; i++) {
+      const spread = (i - 1) * 0.3;
+      const proj = this.projectiles.get(this.player.x, this.player.y, 'bullet') as Projectile;
+      if (proj) {
+        proj.fire(this.player.x, this.player.y, angle + spread, 400, 20, ProjectileType.FLAME);
+      }
+    }
   }
 
   private updateEnemyProjectiles(delta: number) {
@@ -929,6 +1251,7 @@ export class GameScene extends Phaser.Scene {
 
     const hitAngle = proj.rotation;
     this.hitSparkEmitter.emitParticleAt(proj.x, proj.y);
+    this.soundManager.playBulletHit(proj.projectileType);
 
     if (proj.isExplosive) {
       this.createExplosion(proj.x, proj.y, proj.explosionRadius, proj.damage);
@@ -937,10 +1260,16 @@ export class GameScene extends Phaser.Scene {
     }
 
     const applyPoison = proj.isPoisoned;
-    const killed = enemy.takeDamage(proj.damage, applyPoison);
+    const damage = proj.damage;
+    const killed = enemy.takeDamage(damage, applyPoison);
+
+    const doctorHeal = this.player.perkManager.getDoctorHealAmount(damage);
+    if (doctorHeal > 0) {
+      this.player.heal(doctorHeal);
+    }
 
     if (proj.projectileType === ProjectileType.ION) {
-      this.trySpawnIonChain(enemy.x, enemy.y, proj.damage, enemy);
+      this.trySpawnIonChain(enemy.x, enemy.y, damage, enemy);
     }
 
     if (!proj.penetrating) {
@@ -948,6 +1277,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (killed) {
+      if (this.player.perkManager.hasRegressionBullets()) {
+        this.player.weaponManager.refundAmmo(1);
+      }
       this.onCreatureKilled(enemy, hitAngle);
     } else {
       this.spawnDirectionalBlood(enemy.x, enemy.y, hitAngle, 3);
@@ -984,9 +1316,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createExplosion(x: number, y: number, radius: number, damage: number) {
+    const size = radius > 100 ? 'large' : radius > 60 ? 'medium' : 'small';
+    this.soundManager.playExplosion(size);
+
     const scale = radius / 80;
     this.spawnExplosionBurst(x, y, scale);
-    this.cameras.main.shake(200, 0.015);
+    const shakePulses = Math.max(5, Math.floor(radius / 10));
+    this.startCameraShake(shakePulses, 0.15);
     this.cameras.main.flash(100, 255, 200, 100, false);
 
     this.creatures.getChildren().forEach((creature) => {
@@ -1010,9 +1346,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onCreatureKilled(enemy: Creature, hitAngle?: number) {
+    this.soundManager.playCreatureDeath(enemy.creatureType);
+
     const xpMultiplier = this.spawnManager.getXpMultiplier();
     this.player.addXp(Math.floor(enemy.xpValue * xpMultiplier));
     this.killCount++;
+
+    this.statsManager.recordKill(enemy.creatureType);
 
     const bloodyMess = this.player.perkManager.hasBloodyMess();
     const angle = hitAngle ?? Math.atan2(enemy.y - this.player.y, enemy.x - this.player.x);
@@ -1022,6 +1362,11 @@ export class GameScene extends Phaser.Scene {
 
     if (enemy.spawnsOnDeath && enemy.spawnCount > 0) {
       this.spawnManager.spawnBabySpiders(enemy.x, enemy.y, enemy.spawnCount);
+    }
+
+    if (enemy.shouldSplitOnDeath()) {
+      const children = enemy.getSplitChildren();
+      this.spawnManager.spawnSplitChildren(enemy.x, enemy.y, children, enemy.creatureType, enemy.customTint);
     }
 
     this.bonusManager.trySpawnBonus(enemy.x, enemy.y);
@@ -1037,18 +1382,44 @@ export class GameScene extends Phaser.Scene {
 
     if (!enemy.active || p.health <= 0) return;
 
-    enemy.attack(p);
-
-    const dx = p.x - enemy.x;
-    const dy = p.y - enemy.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > 0) {
-      p.x += (dx / dist) * 5;
-      p.y += (dy / dist) * 5;
+    if (p.hasActiveEnergizer() && enemy.isFleeing()) {
+      this.onCreatureKilled(enemy);
+      enemy.takeDamage(9999);
+      this.cameras.main.flash(50, 255, 255, 0, false);
+      return;
     }
 
-    if (enemy.damage > 0) {
-      this.cameras.main.shake(50, 0.005);
+    const attacked = enemy.attack(p);
+
+    if (attacked && p.shieldTimer <= 0) {
+      if (p.perkManager.hasToxicAvenger()) {
+        enemy.applyContactPoison(true);
+      } else if (p.perkManager.hasVeinsOfPoison()) {
+        enemy.applyContactPoison(false);
+      }
+
+      const meleeDamage = p.perkManager.getMrMeleeDamage();
+      if (meleeDamage > 0) {
+        const killed = enemy.takeDamage(meleeDamage);
+        if (killed) {
+          this.onCreatureKilled(enemy);
+        }
+      }
+    }
+
+    if (!p.perkManager.hasUnstoppable()) {
+      const dx = p.x - enemy.x;
+      const dy = p.y - enemy.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 0) {
+        p.x += (dx / dist) * 5;
+        p.y += (dy / dist) * 5;
+      }
+    }
+
+    if (attacked && enemy.damage > 0) {
+      this.soundManager.playPlayerHurt();
+      this.startCameraShake(3, 0.1);
       this.cameras.main.flash(50, 255, 0, 0, false);
     }
   }
@@ -1062,9 +1433,10 @@ export class GameScene extends Phaser.Scene {
 
     if (!bullet.active || !bullet.isEnemyProjectile) return;
 
+    this.soundManager.playPlayerHurt();
     p.takeDamage(bullet.damage || 8);
     this.hitSparkEmitter.emitParticleAt(bullet.x, bullet.y);
-    this.cameras.main.shake(50, 0.005);
+    this.startCameraShake(3, 0.1);
     this.cameras.main.flash(50, 255, 0, 0, false);
 
     bullet.setActive(false);
@@ -1080,6 +1452,7 @@ export class GameScene extends Phaser.Scene {
     const b = bonus as Bonus;
     if (!b.active) return;
 
+    this.soundManager.playPickupPowerup();
     this.bonusManager.collectBonus(b);
     this.cameras.main.flash(100, 100, 255, 100, false);
   }
@@ -1089,13 +1462,19 @@ export class GameScene extends Phaser.Scene {
     const dirX = Math.cos(baseAngle);
     const dirY = Math.sin(baseAngle);
     const lifetime = 0.25;
+    const particleCount = Math.ceil(quantity / 4);
 
-    for (let i = 0; i < quantity; i++) {
-      const rotation = ((Math.random() * 64 - 32) * 0.1) + baseAngle;
-      const halfSize = Math.floor(Math.random() * 8) + 1;
-      const velX = ((Math.random() * 64) + 100) * dirX;
-      const velY = ((Math.random() * 64) + 100) * dirY;
-      const scaleStep = (Math.random() * 64) * 0.03 + 0.1;
+    for (let i = 0; i < particleCount; i++) {
+      const r0 = Math.floor(Math.random() * 256);
+      const rotation = ((r0 & 0x3F) - 0x20) * 0.1 + baseAngle;
+      const r1 = Math.floor(Math.random() * 256);
+      const halfSize = (r1 & 7) + 1;
+      const r2 = Math.floor(Math.random() * 256);
+      const velX = ((r2 & 0x3F) + 100) * dirX;
+      const r3 = Math.floor(Math.random() * 256);
+      const velY = ((r3 & 0x3F) + 100) * dirY;
+      const r4 = Math.floor(Math.random() * 256);
+      const scaleStep = (r4 & 0x7F) * 0.03 + 0.1;
 
       if (this.textures.exists('particles_sheet')) {
         const particle = this.add.image(x, y, 'particles_sheet', 5);
@@ -1103,6 +1482,7 @@ export class GameScene extends Phaser.Scene {
         particle.setRotation(rotation);
         particle.setScale(halfSize / 16);
         particle.setAlpha(0.5);
+        particle.setTint(0xcc3333);
 
         this.tweens.add({
           targets: particle,
@@ -1124,8 +1504,8 @@ export class GameScene extends Phaser.Scene {
           x: x + velX * lifetime,
           y: y + velY * lifetime,
           alpha: 0,
-          scaleX: 0.3,
-          scaleY: 0.3,
+          scaleX: 1 + scaleStep * lifetime,
+          scaleY: 1 + scaleStep * lifetime,
           duration: 250,
           ease: 'Linear',
           onComplete: () => particle.destroy()
@@ -1171,7 +1551,8 @@ export class GameScene extends Phaser.Scene {
     const shockwaveRing = this.add.graphics();
     shockwaveRing.setDepth(16);
     shockwaveRing.fillStyle(0x999999, 1.0);
-    shockwaveRing.fillCircle(x, y, 32);
+    shockwaveRing.fillCircle(0, 0, 32);
+    shockwaveRing.setPosition(x, y);
 
     this.tweens.add({
       targets: shockwaveRing,
@@ -1187,7 +1568,8 @@ export class GameScene extends Phaser.Scene {
     const brightFlash = this.add.graphics();
     brightFlash.setDepth(17);
     brightFlash.fillStyle(0xffffff, 1.0);
-    brightFlash.fillCircle(x, y, 32);
+    brightFlash.fillCircle(0, 0, 32);
+    brightFlash.setPosition(x, y);
 
     this.tweens.add({
       targets: brightFlash,
@@ -1203,11 +1585,12 @@ export class GameScene extends Phaser.Scene {
       const darkPuff = this.add.graphics();
       darkPuff.setDepth(14);
       darkPuff.fillStyle(0x1a1a1a, 1.0);
-      darkPuff.fillCircle(x, y, 32);
+      darkPuff.fillCircle(0, 0, 32);
+      darkPuff.setPosition(x, y);
 
       const age = i * 0.2 - 0.5;
       const lifetime = i * 0.2 + 0.6;
-      const rotation = Math.random() * 6.28;
+      const rotation = (Math.floor(Math.random() * 0x266) * 0.02);
 
       this.tweens.add({
         targets: darkPuff,
@@ -1342,6 +1725,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private showLevelUpEffect() {
+    this.soundManager.playUiLevelUp();
+
     const text = this.add.text(
       this.player.x,
       this.player.y - 40,
@@ -1367,6 +1752,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private freezeAllEnemies(duration: number) {
+    this.soundManager.playFreeze();
+
     this.creatures.getChildren().forEach((creature) => {
       const c = creature as Creature;
       if (c.active) {
@@ -1393,6 +1780,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private nukeAllEnemies() {
+    this.soundManager.playNuke();
     this.cameras.main.shake(300, 0.03);
     this.cameras.main.flash(300, 255, 255, 200, false);
 
@@ -1411,16 +1799,216 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private triggerShockChain() {
+    this.cameras.main.flash(200, 100, 150, 255, false);
+    this.cameras.main.shake(150, 0.01);
+
+    const activeCreatures = this.creatures.getChildren()
+      .filter(c => (c as Creature).active)
+      .map(c => c as Creature);
+
+    if (activeCreatures.length === 0) return;
+
+    let currentTarget = activeCreatures.reduce((nearest, c) => {
+      const distA = Phaser.Math.Distance.Between(this.player.x, this.player.y, nearest.x, nearest.y);
+      const distB = Phaser.Math.Distance.Between(this.player.x, this.player.y, c.x, c.y);
+      return distB < distA ? c : nearest;
+    }, activeCreatures[0]);
+
+    const chainedTargets = new Set<Creature>();
+    const maxChainLinks = 15;
+    const chainDamage = 50;
+    const maxChainDist = 150;
+
+    let prevX = this.player.x;
+    let prevY = this.player.y;
+
+    for (let i = 0; i < maxChainLinks && currentTarget; i++) {
+      chainedTargets.add(currentTarget);
+
+      this.drawLightningBolt(prevX, prevY, currentTarget.x, currentTarget.y);
+
+      const killed = currentTarget.takeDamage(chainDamage);
+      if (killed) {
+        this.onCreatureKilled(currentTarget);
+      }
+
+      prevX = currentTarget.x;
+      prevY = currentTarget.y;
+
+      let nextTarget: Creature | null = null;
+      let nearestDist = maxChainDist;
+
+      for (const c of activeCreatures) {
+        if (chainedTargets.has(c) || !c.active || c.health <= 0) continue;
+        const dist = Phaser.Math.Distance.Between(prevX, prevY, c.x, c.y);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nextTarget = c;
+        }
+      }
+
+      currentTarget = nextTarget!;
+    }
+  }
+
+  private drawLightningBolt(x1: number, y1: number, x2: number, y2: number) {
+    const graphics = this.add.graphics();
+    graphics.setDepth(20);
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const segments = Math.max(3, Math.floor(dist / 20));
+
+    graphics.lineStyle(3, 0x8888ff, 1);
+    graphics.beginPath();
+    graphics.moveTo(x1, y1);
+
+    for (let i = 1; i < segments; i++) {
+      const t = i / segments;
+      const px = x1 + dx * t + (Math.random() - 0.5) * 20;
+      const py = y1 + dy * t + (Math.random() - 0.5) * 20;
+      graphics.lineTo(px, py);
+    }
+
+    graphics.lineTo(x2, y2);
+    graphics.strokePath();
+
+    graphics.lineStyle(1, 0xffffff, 0.8);
+    graphics.beginPath();
+    graphics.moveTo(x1, y1);
+
+    for (let i = 1; i < segments; i++) {
+      const t = i / segments;
+      const px = x1 + dx * t + (Math.random() - 0.5) * 10;
+      const py = y1 + dy * t + (Math.random() - 0.5) * 10;
+      graphics.lineTo(px, py);
+    }
+
+    graphics.lineTo(x2, y2);
+    graphics.strokePath();
+
+    this.tweens.add({
+      targets: graphics,
+      alpha: 0,
+      duration: 200,
+      onComplete: () => graphics.destroy()
+    });
+  }
+
+  private triggerFireblast() {
+    this.cameras.main.flash(200, 255, 150, 50, false);
+    this.cameras.main.shake(200, 0.02);
+
+    const fireballCount = 16;
+    const damage = 40;
+    const speed = 300;
+
+    for (let i = 0; i < fireballCount; i++) {
+      const angle = (i / fireballCount) * Math.PI * 2;
+      const fireball = this.projectiles.get(this.player.x, this.player.y, 'bullet') as Projectile;
+      if (fireball) {
+        fireball.fire(this.player.x, this.player.y, angle, speed, damage, ProjectileType.FLAME);
+      }
+    }
+
+    this.spawnExplosionBurst(this.player.x, this.player.y, 0.5);
+  }
+
+  private triggerEnergizer(duration: number) {
+    this.cameras.main.flash(200, 255, 255, 100, false);
+
+    this.creatures.getChildren().forEach((creature) => {
+      const c = creature as Creature;
+      if (c.active) {
+        c.flee(duration);
+      }
+    });
+  }
+
+  private triggerManBombExplosion() {
+    this.cameras.main.flash(400, 255, 200, 100, false);
+    this.cameras.main.shake(400, 0.05);
+
+    const explosionRadius = 200;
+    const explosionDamage = 500;
+
+    this.spawnExplosionBurst(this.player.x, this.player.y, 2.5);
+
+    this.creatures.getChildren().forEach((creature) => {
+      const c = creature as Creature;
+      if (!c.active) return;
+
+      const dx = c.x - this.player.x;
+      const dy = c.y - this.player.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < explosionRadius) {
+        const falloff = 1 - (dist / explosionRadius);
+        const damage = explosionDamage * falloff;
+        const killed = c.takeDamage(damage);
+        if (killed) {
+          this.onCreatureKilled(c);
+        }
+      }
+    });
+
+    this.time.delayedCall(1000, () => {
+      this.player.respawn(0.5);
+      this.manBombRespawnPending = true;
+    });
+  }
+
+  private triggerFinalRevenge() {
+    this.cameras.main.flash(500, 255, 100, 50, false);
+    this.cameras.main.shake(500, 0.06);
+
+    const explosionRadius = 300;
+    const explosionDamage = 1000;
+
+    this.spawnExplosionBurst(this.player.x, this.player.y, 3.5);
+
+    this.creatures.getChildren().forEach((creature) => {
+      const c = creature as Creature;
+      if (!c.active) return;
+
+      const dx = c.x - this.player.x;
+      const dy = c.y - this.player.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < explosionRadius) {
+        const falloff = 1 - (dist / explosionRadius);
+        const damage = explosionDamage * falloff;
+        const killed = c.takeDamage(damage);
+        if (killed) {
+          this.onCreatureKilled(c);
+        }
+      }
+    });
+  }
+
   private handleGameOver() {
     this.gameOver = true;
 
     const timePlayed = Date.now() - this.gameStartTime;
+    const defaultName = this.saveManager.getPlayerName();
+    const accuracy = this.statsManager.getAccuracy();
+    const weaponId = this.player.weaponManager.currentWeaponIndex;
+
     const { rank, isHighScore } = this.highScoreManager.addScore(
       this.killCount,
       this.player.level,
       timePlayed,
-      this.gameMode
+      this.gameMode,
+      defaultName,
+      accuracy,
+      weaponId
     );
+
+    this.statsManager.recordGameEnd(timePlayed, this.player.level);
+    this.nameInputRank = isHighScore ? rank : -1;
+    this.nameInputText = defaultName;
 
     const scale = Math.min(
       SCREEN_WIDTH / UI.BASE_WIDTH,
@@ -1576,20 +2164,76 @@ export class GameScene extends Phaser.Scene {
       fontFamily: 'Arial'
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(201);
 
-    const buttonY = scoreCardY + sx(100);
+    let buttonY = scoreCardY + sx(100);
     const buttonX = bannerX + sx(52);
 
+    if (isHighScore && rank < 10) {
+      this.add.text(buttonX + sx(75), buttonY - sx(8), 'NEW HIGH SCORE!', {
+        fontSize: `${Math.floor(14 * clampedScale)}px`,
+        color: '#f0c850',
+        fontFamily: 'Arial Black'
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+      this.add.text(buttonX + sx(75), buttonY + sx(12), 'Enter your name:', {
+        fontSize: `${Math.floor(11 * clampedScale)}px`,
+        color: '#e6e6e6',
+        fontFamily: 'Arial'
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+      const inputW = sx(UI.GAME_OVER.INPUT_BOX_W);
+      const inputH = sx(UI.GAME_OVER.INPUT_BOX_H);
+
+      const inputBg = this.add.rectangle(buttonX + sx(75), buttonY + sx(32), inputW, inputH, 0x1a1a1a, 0.9);
+      inputBg.setStrokeStyle(2, 0x46b4f0);
+      inputBg.setScrollFactor(0);
+      inputBg.setDepth(201);
+
+      const inputText = this.add.text(buttonX + sx(75), buttonY + sx(32), this.nameInputText || 'Player', {
+        fontSize: `${Math.floor(12 * clampedScale)}px`,
+        color: '#ffffff',
+        fontFamily: 'Arial'
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
+
+      this.nameInputActive = true;
+      this.input.keyboard!.on('keydown', (event: KeyboardEvent) => {
+        if (!this.nameInputActive) return;
+
+        if (event.key === 'Backspace') {
+          this.nameInputText = this.nameInputText.slice(0, -1);
+        } else if (event.key === 'Enter') {
+          this.submitHighScoreName();
+        } else if (event.key.length === 1 && this.nameInputText.length < 20) {
+          this.nameInputText += event.key;
+        }
+
+        inputText.setText(this.nameInputText || 'Player');
+      });
+
+      buttonY += sx(50);
+    }
+
     const playAgainBtn = this.createGameOverButton(buttonX + sx(75), buttonY, 'Play Again', () => {
+      this.submitHighScoreName();
       this.scene.start('GameScene', { gameMode: this.gameMode });
     });
     playAgainBtn.setScrollFactor(0);
     playAgainBtn.setDepth(201);
 
     const menuBtn = this.createGameOverButton(buttonX + sx(75), buttonY + sx(32), 'Main Menu', () => {
+      this.submitHighScoreName();
       this.scene.start('MenuScene');
     });
     menuBtn.setScrollFactor(0);
     menuBtn.setDepth(201);
+  }
+
+  private submitHighScoreName() {
+    if (this.nameInputActive && this.nameInputRank >= 0) {
+      const name = this.nameInputText.trim() || 'Player';
+      this.highScoreManager.updateEntryName(this.gameMode, this.nameInputRank, name);
+      this.saveManager.setPlayerName(name);
+      this.nameInputActive = false;
+    }
   }
 
   private createGameOverButton(x: number, y: number, label: string, callback: () => void): Phaser.GameObjects.Container {

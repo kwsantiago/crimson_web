@@ -5,10 +5,16 @@ export enum BonusType {
   WEAPON = 3,
   MEDIKIT = 4,
   NUKE = 5,
+  DOUBLE_EXPERIENCE = 6,
+  SHOCK_CHAIN = 7,
+  FIREBLAST = 8,
+  REFLEX_BOOST = 9,
+  SHIELD = 10,
   FREEZE = 11,
   SPEED = 12,
-  SHIELD = 10,
-  REFLEX_BOOST = 9
+  WEAPON_POWER_UP = 13,
+  FIRE_BULLETS = 14,
+  ENERGIZER = 15
 }
 
 export interface BonusData {
@@ -84,6 +90,42 @@ export const BONUSES: Record<BonusType, BonusData> = {
     name: 'Reflex Boost',
     sprite: 'bonus_reflex',
     duration: 5
+  },
+  [BonusType.DOUBLE_EXPERIENCE]: {
+    type: BonusType.DOUBLE_EXPERIENCE,
+    name: 'Double Experience',
+    sprite: 'bonus_double_xp',
+    duration: 6
+  },
+  [BonusType.WEAPON_POWER_UP]: {
+    type: BonusType.WEAPON_POWER_UP,
+    name: 'Weapon Power Up',
+    sprite: 'bonus_power_up',
+    duration: 10
+  },
+  [BonusType.SHOCK_CHAIN]: {
+    type: BonusType.SHOCK_CHAIN,
+    name: 'Shock Chain',
+    sprite: 'bonus_shock',
+    duration: 0
+  },
+  [BonusType.FIREBLAST]: {
+    type: BonusType.FIREBLAST,
+    name: 'Fireblast',
+    sprite: 'bonus_fireblast',
+    duration: 0
+  },
+  [BonusType.FIRE_BULLETS]: {
+    type: BonusType.FIRE_BULLETS,
+    name: 'Fire Bullets',
+    sprite: 'bonus_fire_bullets',
+    duration: 5
+  },
+  [BonusType.ENERGIZER]: {
+    type: BonusType.ENERGIZER,
+    name: 'Energizer',
+    sprite: 'bonus_energizer',
+    duration: 8
   }
 };
 
@@ -97,16 +139,22 @@ export interface SpawnWeight {
 }
 
 export const BONUS_SPAWN_WEIGHTS: SpawnWeight[] = [
-  { type: BonusType.XP_SMALL, weight: 0.40 },
-  { type: BonusType.XP_MEDIUM, weight: 0.15 },
-  { type: BonusType.XP_LARGE, weight: 0.10 },
-  { type: BonusType.WEAPON, weight: 0.10 },
-  { type: BonusType.MEDIKIT, weight: 0.07 },
+  { type: BonusType.XP_SMALL, weight: 0.30 },
+  { type: BonusType.XP_MEDIUM, weight: 0.12 },
+  { type: BonusType.XP_LARGE, weight: 0.08 },
+  { type: BonusType.WEAPON, weight: 0.08 },
+  { type: BonusType.MEDIKIT, weight: 0.06 },
   { type: BonusType.SPEED, weight: 0.04 },
   { type: BonusType.FREEZE, weight: 0.04 },
   { type: BonusType.SHIELD, weight: 0.03 },
   { type: BonusType.REFLEX_BOOST, weight: 0.03 },
-  { type: BonusType.NUKE, weight: 0.04 }
+  { type: BonusType.NUKE, weight: 0.03 },
+  { type: BonusType.DOUBLE_EXPERIENCE, weight: 0.04 },
+  { type: BonusType.WEAPON_POWER_UP, weight: 0.04 },
+  { type: BonusType.SHOCK_CHAIN, weight: 0.03 },
+  { type: BonusType.FIREBLAST, weight: 0.03 },
+  { type: BonusType.FIRE_BULLETS, weight: 0.03 },
+  { type: BonusType.ENERGIZER, weight: 0.02 }
 ];
 
 export function pickRandomBonusType(): BonusType {

@@ -1,8 +1,18 @@
 import Phaser from 'phaser';
-import { Creature } from '../entities/Creature';
+import { Creature, CreatureConfig, clearCreaturePool } from '../entities/Creature';
 import { CreatureType } from '../data/creatures';
 import { GameMode, GameModeConfig, GAME_MODE_CONFIGS } from '../data/gameModes';
 import { WORLD_WIDTH, WORLD_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT } from '../config';
+import {
+  AIMode,
+  CreatureFlags,
+  TintRGBA,
+  generateRingFormation,
+  generateGridFormation,
+  experienceBasedTint,
+  rollVariantStats,
+  VARIANT_TINTS
+} from './CreatureAI';
 
 export class SpawnManager {
   private scene: Phaser.Scene;
@@ -13,6 +23,7 @@ export class SpawnManager {
   private timeElapsed: number = 0;
   private spawnStage: number = 0;
   private playerLevel: number = 1;
+  private playerXp: number = 0;
   private stageNotified: boolean[] = [];
   private gameMode: GameMode = GameMode.SURVIVAL;
   private modeConfig: GameModeConfig;
@@ -32,13 +43,15 @@ export class SpawnManager {
     for (let i = 0; i < 15; i++) {
       this.stageNotified.push(false);
     }
+    clearCreaturePool();
   }
 
-  update(delta: number, playerLevel: number) {
+  update(delta: number, playerLevel: number, playerXp?: number) {
     const dt = delta / 1000;
     this.timeElapsed += dt;
     this.spawnTimer -= dt;
     this.playerLevel = playerLevel;
+    this.playerXp = playerXp ?? this.playerLevel * 1000;
 
     if (this.gameMode === GameMode.RUSH) {
       this.updateRush(dt);
@@ -77,7 +90,7 @@ export class SpawnManager {
     for (let i = 0; i < count; i++) {
       const pos = this.getRushSpawnPosition(elapsedMs, i);
       const type = this.pickRushCreatureType();
-      this.spawnCreature(type, pos.x, pos.y, true);
+      this.spawnCreatureWithVariant(type, pos.x, pos.y, true);
     }
   }
 
@@ -135,7 +148,7 @@ export class SpawnManager {
       this.spawnStage = 2;
       if (!this.stageNotified[2]) {
         this.stageNotified[2] = true;
-        this.spawnCreatureGroup(CreatureType.SPIDER, 10);
+        this.spawnRingFormation(CreatureType.ALIEN, 8, 100);
       }
     }
     if (this.spawnStage === 2 && this.playerLevel >= 7) {
@@ -149,7 +162,7 @@ export class SpawnManager {
       this.spawnStage = 4;
       if (!this.stageNotified[4]) {
         this.stageNotified[4] = true;
-        this.spawnCreatureGroup(CreatureType.ALIEN, 5);
+        this.spawnSplitter(WORLD_WIDTH + 50, WORLD_HEIGHT / 2);
       }
     }
     if (this.spawnStage === 4 && this.playerLevel >= 11) {
@@ -163,36 +176,39 @@ export class SpawnManager {
       this.spawnStage = 6;
       if (!this.stageNotified[6]) {
         this.stageNotified[6] = true;
-        this.spawnCreatureGroup(CreatureType.LIZARD, 8);
+        this.spawnChainFormation(CreatureType.LIZARD, 4);
       }
     }
     if (this.spawnStage === 6 && this.playerLevel >= 15) {
       this.spawnStage = 7;
       if (!this.stageNotified[7]) {
         this.stageNotified[7] = true;
-        this.spawnCreatureGroup(CreatureType.ALIEN_ELITE, 4);
-        this.spawnCreatureGroup(CreatureType.LIZARD_SPITTER, 4);
+        this.spawnOrbiter(WORLD_WIDTH + 50, WORLD_HEIGHT / 2);
+        this.spawnOrbiter(-50, WORLD_HEIGHT / 2);
       }
     }
     if (this.spawnStage === 7 && this.playerLevel >= 17) {
       this.spawnStage = 8;
       if (!this.stageNotified[8]) {
         this.stageNotified[8] = true;
-        this.spawnCreatureGroup(CreatureType.NEST, 2);
+        this.spawnShockBoss(WORLD_WIDTH + 50, WORLD_HEIGHT / 2);
       }
     }
     if (this.spawnStage === 8 && this.playerLevel >= 20) {
       this.spawnStage = 9;
       if (!this.stageNotified[9]) {
         this.stageNotified[9] = true;
-        this.spawnCreature(CreatureType.ALIEN_BOSS, WORLD_WIDTH / 2, 50);
+        this.spawnRangedVariant(WORLD_WIDTH + 50, WORLD_HEIGHT / 2 - 100);
+        this.spawnRangedVariant(WORLD_WIDTH + 50, WORLD_HEIGHT / 2 + 100);
+        this.spawnRangedVariant(-50, WORLD_HEIGHT / 2 - 100);
+        this.spawnRangedVariant(-50, WORLD_HEIGHT / 2 + 100);
       }
     }
     if (this.spawnStage === 9 && this.playerLevel >= 25) {
       this.spawnStage = 10;
       if (!this.stageNotified[10]) {
         this.stageNotified[10] = true;
-        this.spawnCreature(CreatureType.BOSS, WORLD_WIDTH / 2, WORLD_HEIGHT - 50);
+        this.spawnGridFormation(CreatureType.ALIEN, -50, WORLD_HEIGHT / 2);
       }
     }
   }
@@ -226,7 +242,7 @@ export class SpawnManager {
       for (let i = 0; i < count; i++) {
         const pos = this.getSpawnPosition();
         const type = this.pickCreatureType();
-        this.spawnCreature(type, pos.x, pos.y);
+        this.spawnCreatureWithVariant(type, pos.x, pos.y);
       }
       return;
     }
@@ -243,12 +259,12 @@ export class SpawnManager {
     for (let i = 0; i < extraSpawns; i++) {
       const pos = this.getSpawnPosition();
       const type = this.pickCreatureType();
-      this.spawnCreature(type, pos.x, pos.y);
+      this.spawnCreatureWithVariant(type, pos.x, pos.y);
     }
 
     const pos = this.getSpawnPosition();
     const type = this.pickCreatureType();
-    this.spawnCreature(type, pos.x, pos.y);
+    this.spawnCreatureWithVariant(type, pos.x, pos.y);
   }
 
   private pickCreatureType(): CreatureType {
@@ -327,8 +343,38 @@ export class SpawnManager {
     }
   }
 
-  private spawnCreature(type: CreatureType, x: number, y: number, applyRushModifiers: boolean = false) {
-    const creature = new Creature(this.scene, x, y, type, this.enemyProjectiles);
+  private spawnCreature(type: CreatureType, x: number, y: number, config?: CreatureConfig) {
+    const creature = new Creature(this.scene, x, y, type, this.enemyProjectiles, config);
+    this.creatures.add(creature);
+    return creature;
+  }
+
+  private spawnCreatureWithVariant(
+    type: CreatureType,
+    x: number,
+    y: number,
+    applyRushModifiers: boolean = false
+  ) {
+    const rand = () => Math.floor(Math.random() * 0x7FFFFFFF);
+    const baseHealth = 20 + this.playerXp * 0.00125;
+    const baseReward = baseHealth * 0.4 + 15;
+
+    const variant = rollVariantStats(baseHealth, baseReward, rand);
+
+    let config: CreatureConfig | undefined;
+
+    if (variant.tint) {
+      config = {
+        tint: variant.tint,
+        healthOverride: variant.health,
+        xpOverride: Math.floor(variant.reward * 0.8)
+      };
+    } else if (this.playerXp > 5000) {
+      const tint = experienceBasedTint(this.playerXp, rand);
+      config = { tint };
+    }
+
+    const creature = new Creature(this.scene, x, y, type, this.enemyProjectiles, config);
 
     if (applyRushModifiers || this.gameMode === GameMode.RUSH) {
       creature.speed *= this.modeConfig.enemySpeedMultiplier;
@@ -336,6 +382,7 @@ export class SpawnManager {
     }
 
     this.creatures.add(creature);
+    return creature;
   }
 
   spawnBabySpiders(x: number, y: number, count: number) {
@@ -345,6 +392,184 @@ export class SpawnManager {
       const spider = new Creature(this.scene, x + offsetX, y + offsetY, CreatureType.BABY_SPIDER);
       this.creatures.add(spider);
     }
+  }
+
+  spawnSplitChildren(parentX: number, parentY: number, children: {
+    health: number;
+    size: number;
+    speed: number;
+    damage: number;
+    xp: number;
+    heading: number;
+  }[], parentType: CreatureType, parentTint: TintRGBA | null) {
+    for (const child of children) {
+      const config: CreatureConfig = {
+        flags: CreatureFlags.SPLIT_ON_DEATH,
+        sizeOverride: child.size,
+        healthOverride: child.health,
+        speedOverride: child.speed,
+        damageOverride: child.damage,
+        xpOverride: child.xp,
+        phaseSeed: Math.random() * 0x17F,
+        tint: parentTint ?? undefined
+      };
+      const creature = new Creature(
+        this.scene,
+        parentX,
+        parentY,
+        parentType,
+        this.enemyProjectiles,
+        config
+      );
+      creature.heading = child.heading;
+      this.creatures.add(creature);
+    }
+  }
+
+  private spawnRingFormation(type: CreatureType, count: number, radius: number) {
+    const pos = this.getSpawnPosition();
+    const ring = generateRingFormation(count, radius);
+
+    const parentConfig: CreatureConfig = {
+      healthOverride: 200,
+      xpOverride: 600,
+      tint: { r: 0.65, g: 0.85, b: 0.97, a: 1.0 }
+    };
+    const parent = this.spawnCreature(type, pos.x, pos.y, parentConfig);
+
+    for (const child of ring) {
+      const childConfig: CreatureConfig = {
+        aiMode: AIMode.FORMATION,
+        linkIndex: parent.poolIndex,
+        targetOffsetX: child.offsetX,
+        targetOffsetY: child.offsetY,
+        healthOverride: 40,
+        speedOverride: 72,
+        xpOverride: 60,
+        tint: { r: 0.32, g: 0.588, b: 0.426, a: 1.0 }
+      };
+      this.spawnCreature(type, pos.x + child.offsetX, pos.y + child.offsetY, childConfig);
+    }
+  }
+
+  private spawnChainFormation(type: CreatureType, count: number) {
+    const pos = this.getSpawnPosition();
+
+    const parentConfig: CreatureConfig = {
+      aiMode: AIMode.SWARM,
+      healthOverride: 1500,
+      xpOverride: 1000,
+      damageOverride: 150,
+      sizeOverride: 69,
+      tint: { r: 0.99, g: 0.99, b: 0.21, a: 1.0 }
+    };
+    const parent = this.spawnCreature(type, pos.x, pos.y, parentConfig);
+
+    let prevIndex = parent.poolIndex;
+    for (let i = 0; i < count; i++) {
+      const angle = (2 + i * 2) * (Math.PI / 8.0);
+      const childX = pos.x + Math.cos(angle) * 256.0;
+      const childY = pos.y + Math.sin(angle) * 256.0;
+
+      const childConfig: CreatureConfig = {
+        aiMode: AIMode.FORMATION,
+        linkIndex: prevIndex,
+        targetOffsetX: -256.0 + i * 64.0,
+        targetOffsetY: -256.0,
+        healthOverride: 60,
+        speedOverride: 72,
+        xpOverride: 60,
+        damageOverride: 14,
+        tint: { r: 0.6, g: 0.6, b: 0.31, a: 1.0 }
+      };
+      const child = this.spawnCreature(type, childX, childY, childConfig);
+      prevIndex = child.poolIndex;
+    }
+  }
+
+  private spawnGridFormation(type: CreatureType, x: number, y: number) {
+    const grid = generateGridFormation([0, -576], [128, 257], -64, 16);
+
+    const parentConfig: CreatureConfig = {
+      aiMode: AIMode.BEELINE,
+      healthOverride: 1500,
+      xpOverride: 600,
+      damageOverride: 40,
+      tint: { r: 0.7, g: 0.8, b: 0.31, a: 1.0 }
+    };
+    const parent = this.spawnCreature(type, x, y, parentConfig);
+
+    for (const child of grid) {
+      const childConfig: CreatureConfig = {
+        aiMode: AIMode.LINKED_STOP,
+        linkIndex: parent.poolIndex,
+        targetOffsetX: child.offsetX,
+        targetOffsetY: child.offsetY,
+        healthOverride: 40,
+        speedOverride: 60,
+        xpOverride: 60,
+        damageOverride: 4,
+        tint: { r: 0.4, g: 0.7, b: 0.11, a: 1.0 }
+      };
+      this.spawnCreature(type, x + child.offsetX, y + child.offsetY, childConfig);
+    }
+  }
+
+  private spawnOrbiter(x: number, y: number) {
+    const config: CreatureConfig = {
+      aiMode: AIMode.HOLD,
+      flags: CreatureFlags.AI7_LINK_TIMER,
+      healthOverride: 10,
+      speedOverride: 54,
+      xpOverride: 150,
+      damageOverride: 40,
+      orbitRadius: 1.5,
+      tint: { r: 0.65, g: 0.7, b: 0.95, a: 1.0 }
+    };
+    this.spawnCreature(CreatureType.ALIEN, x, y, config);
+  }
+
+  private spawnShockBoss(x: number, y: number) {
+    const config: CreatureConfig = {
+      flags: CreatureFlags.RANGED_ATTACK_SHOCK,
+      healthOverride: 4500,
+      speedOverride: 60,
+      xpOverride: 4500,
+      damageOverride: 50,
+      sizeOverride: 64,
+      orbitAngle: 0.9,
+      tint: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }
+    };
+    this.spawnCreature(CreatureType.SPIDER, x, y, config);
+  }
+
+  private spawnRangedVariant(x: number, y: number) {
+    const config: CreatureConfig = {
+      aiMode: AIMode.BEELINE,
+      flags: CreatureFlags.RANGED_ATTACK_VARIANT,
+      healthOverride: 200,
+      speedOverride: 60,
+      xpOverride: 200,
+      damageOverride: 20,
+      sizeOverride: 40,
+      orbitAngle: 0.4,
+      rangedProjectileType: 26,
+      tint: { r: 0.9, g: 0.1, b: 0.1, a: 1.0 }
+    };
+    this.spawnCreature(CreatureType.SPIDER, x, y, config);
+  }
+
+  private spawnSplitter(x: number, y: number) {
+    const config: CreatureConfig = {
+      flags: CreatureFlags.SPLIT_ON_DEATH,
+      healthOverride: 400,
+      speedOverride: 60,
+      xpOverride: 1000,
+      damageOverride: 17,
+      sizeOverride: 80,
+      tint: { r: 0.8, g: 0.7, b: 0.4, a: 1.0 }
+    };
+    this.spawnCreature(CreatureType.SPIDER_MOTHER, x, y, config);
   }
 
   private getSpawnPosition(): { x: number; y: number } {
@@ -393,5 +618,6 @@ export class SpawnManager {
     for (let i = 0; i < this.stageNotified.length; i++) {
       this.stageNotified[i] = false;
     }
+    clearCreaturePool();
   }
 }

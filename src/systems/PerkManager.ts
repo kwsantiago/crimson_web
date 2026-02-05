@@ -1,4 +1,4 @@
-import { PerkId, PERKS, AVAILABLE_PERKS, getPerkData } from '../data/perks';
+import { PerkId, PERKS, AVAILABLE_PERKS, getPerkData, PERK_PREREQUISITES } from '../data/perks';
 import { WEAPONS, ProjectileType } from '../data/weapons';
 
 export interface PerkCounts {
@@ -24,6 +24,8 @@ export class PerkManager {
   private highlander: boolean = false;
   private deathClock: boolean = false;
   private manBombUsed: boolean = false;
+  private bloodyMessToggle: number = 0;
+  livingFortressTimer: number = 0;
 
   constructor() {
     for (const perkId of Object.values(PerkId)) {
@@ -47,6 +49,11 @@ export class PerkManager {
 
   canTakePerk(perkId: PerkId): boolean {
     if (this.highlander && this.getTotalPerkCount() > 0 && perkId !== PerkId.HIGHLANDER) {
+      return false;
+    }
+
+    const prereq = PERK_PREREQUISITES[perkId];
+    if (prereq !== undefined && !this.hasPerk(prereq)) {
       return false;
     }
 
@@ -231,7 +238,25 @@ export class PerkManager {
   }
 
   hasBloodyMess(): boolean {
-    return this.hasPerk(PerkId.BLOODY_MESS);
+    return this.hasPerk(PerkId.BLOODY_MESS_QUICK_LEARNER) && this.bloodyMessToggle === 0;
+  }
+
+  hasQuickLearner(): boolean {
+    return this.hasPerk(PerkId.BLOODY_MESS_QUICK_LEARNER) && this.bloodyMessToggle !== 0;
+  }
+
+  toggleBloodyMessQuickLearner(): void {
+    this.bloodyMessToggle = this.bloodyMessToggle === 0 ? 1 : 0;
+  }
+
+  getXpMultiplier(): number {
+    if (this.hasQuickLearner()) {
+      return this.highlander ? 4.0 : 1.3;
+    }
+    if (this.hasBloodyMess()) {
+      return this.highlander ? 4.0 : 1.3;
+    }
+    return 1.0;
   }
 
   hasPoisonBullets(): boolean {
@@ -309,6 +334,84 @@ export class PerkManager {
     return this.hasPerk(PerkId.MY_FAVOURITE_WEAPON);
   }
 
+  hasLivingFortress(): boolean {
+    return this.hasPerk(PerkId.LIVING_FORTRESS);
+  }
+
+  getLivingFortressDamageMultiplier(): number {
+    if (!this.hasLivingFortress()) return 1.0;
+    return 1.0 + this.livingFortressTimer * 0.05;
+  }
+
+  updateLivingFortress(dt: number, isMoving: boolean): void {
+    if (!this.hasLivingFortress()) {
+      this.livingFortressTimer = 0;
+      return;
+    }
+    if (isMoving) {
+      this.livingFortressTimer = 0;
+    } else {
+      this.livingFortressTimer = Math.min(30.0, this.livingFortressTimer + dt);
+    }
+  }
+
+  hasDoctor(): boolean {
+    return this.hasPerk(PerkId.DOCTOR);
+  }
+
+  getDoctorHealAmount(damage: number): number {
+    if (!this.hasDoctor()) return 0;
+    const count = this.getEffectiveStacks(PerkId.DOCTOR);
+    return damage * 0.01 * count;
+  }
+
+  hasVeinsOfPoison(): boolean {
+    return this.hasPerk(PerkId.VEINS_OF_POISON);
+  }
+
+  hasToxicAvenger(): boolean {
+    return this.hasPerk(PerkId.TOXIC_AVENGER);
+  }
+
+  hasDodger(): boolean {
+    return this.hasPerk(PerkId.DODGER);
+  }
+
+  hasNinja(): boolean {
+    return this.hasPerk(PerkId.NINJA);
+  }
+
+  getDodgeChance(): number {
+    if (this.hasNinja()) return 0.33;
+    if (this.hasDodger()) return 0.2;
+    return 0;
+  }
+
+  hasMrMelee(): boolean {
+    return this.hasPerk(PerkId.MR_MELEE);
+  }
+
+  getMrMeleeDamage(): number {
+    if (!this.hasMrMelee()) return 0;
+    return this.highlander ? 250 : 25;
+  }
+
+  hasUnstoppable(): boolean {
+    return this.hasPerk(PerkId.UNSTOPPABLE);
+  }
+
+  hasToughReloader(): boolean {
+    return this.hasPerk(PerkId.TOUGH_RELOADER);
+  }
+
+  hasFinalRevenge(): boolean {
+    return this.hasPerk(PerkId.FINAL_REVENGE);
+  }
+
+  hasTelekinetic(): boolean {
+    return this.hasPerk(PerkId.TELEKINETIC);
+  }
+
   getBonusDurationMultiplier(): number {
     if (this.hasPerk(PerkId.BONUS_ECONOMIST)) {
       return this.highlander ? 3.0 : 1.5;
@@ -353,5 +456,7 @@ export class PerkManager {
     this.highlander = false;
     this.deathClock = false;
     this.manBombUsed = false;
+    this.bloodyMessToggle = 0;
+    this.livingFortressTimer = 0;
   }
 }

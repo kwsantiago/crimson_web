@@ -1,6 +1,54 @@
 import Phaser from 'phaser';
 import { Player } from './Player';
 import { CreatureType, CreatureData, getCreatureData, CREATURES } from '../data/creatures';
+import {
+  AIMode,
+  CreatureFlags,
+  CreatureAIState,
+  CreatureLink,
+  updateCreatureAITarget,
+  tickAI7LinkTimer,
+  angleApproach,
+  wrapAngle,
+  TintRGBA,
+  tintToHex,
+  CREATURE_SPEED_SCALE,
+  CREATURE_TURN_RATE_SCALE
+} from '../systems/CreatureAI';
+
+export interface CreatureConfig {
+  aiMode?: AIMode;
+  flags?: CreatureFlags;
+  linkIndex?: number;
+  targetOffsetX?: number;
+  targetOffsetY?: number;
+  orbitAngle?: number;
+  orbitRadius?: number;
+  phaseSeed?: number;
+  tint?: TintRGBA;
+  sizeOverride?: number;
+  healthOverride?: number;
+  speedOverride?: number;
+  damageOverride?: number;
+  xpOverride?: number;
+  rangedProjectileType?: number;
+}
+
+let creaturePool: Creature[] = [];
+
+export function getCreaturePool(): Creature[] {
+  return creaturePool;
+}
+
+export function registerCreature(creature: Creature): number {
+  const index = creaturePool.length;
+  creaturePool.push(creature);
+  return index;
+}
+
+export function clearCreaturePool(): void {
+  creaturePool = [];
+}
 
 export class Creature extends Phaser.Physics.Arcade.Sprite {
   creatureType: CreatureType;
@@ -14,12 +62,34 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
   spawnCount: number;
   freezeTimer: number = 0;
   poisonTimer: number = 0;
+  fleeTimer: number = 0;
+
+  poolIndex: number = -1;
+  aiMode: AIMode = AIMode.DIRECT;
+  flags: CreatureFlags = CreatureFlags.NONE;
+  linkIndex: number = 0;
+  targetOffsetX: number | null = null;
+  targetOffsetY: number | null = null;
+  phaseSeed: number = 0;
+  orbitAngle: number = 0;
+  orbitRadius: number = 0;
+  heading: number = 0;
+  targetX: number = 0;
+  targetY: number = 0;
+  targetHeading: number = 0;
+  forceTarget: number = 0;
+  moveScale: number = 1.0;
+  rangedProjectileType: number = 0;
+  customTint: TintRGBA | null = null;
+  splitSize: number = 0;
+
   private attackCooldown: number = 0;
   private attackRate: number = 1.0;
   private projectileCooldown: number = 0;
   private projectileRate: number = 2.0;
   private projectiles?: Phaser.Physics.Arcade.Group;
   private poisonDamageTimer: number = 0;
+  private poisonDps: number = 6;
   private freezePulseTimer: number = 0;
   private isDying: boolean = false;
   private shadow: Phaser.GameObjects.Sprite;
@@ -29,12 +99,15 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
   private readonly SHADOW_OFFSET = 3;
   private readonly ANIM_RATE = 8;
 
+  private dropBonus: { bonusType: number; weaponId?: number } | null = null;
+
   constructor(
     scene: Phaser.Scene,
     x: number,
     y: number,
     type: CreatureType = CreatureType.ZOMBIE,
-    projectiles?: Phaser.Physics.Arcade.Group
+    projectiles?: Phaser.Physics.Arcade.Group,
+    config?: CreatureConfig
   ) {
     const data = getCreatureData(type);
     const sheetMap: Record<string, string> = {
@@ -67,29 +140,96 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     this.shadow.setDepth(4);
     this.setDepth(5);
 
-    this.setScale(data.scale);
-    this.shadow.setScale(data.scale * this.SHADOW_SCALE);
-    const scaledCenter = 32 * data.scale;
-    this.setCircle(data.radius, scaledCenter - data.radius, scaledCenter - data.radius);
+    const sizeScale = config?.sizeOverride ? config.sizeOverride / 50 : 1;
+    this.setScale(data.scale * sizeScale);
+    this.shadow.setScale(data.scale * sizeScale * this.SHADOW_SCALE);
+    const scaledCenter = 32 * data.scale * sizeScale;
+    const radius = data.radius * sizeScale;
+    this.setCircle(radius, scaledCenter - radius, scaledCenter - radius);
 
-    this.health = data.health;
-    this.maxHealth = data.health;
-    this.speed = data.speed;
-    this.damage = data.damage;
-    this.xpValue = data.xp;
+    this.health = config?.healthOverride ?? data.health;
+    this.maxHealth = this.health;
+    this.speed = config?.speedOverride ?? data.speed;
+    this.damage = config?.damageOverride ?? data.damage;
+    this.xpValue = config?.xpOverride ?? data.xp;
     this.isRanged = data.isRanged;
     this.spawnsOnDeath = data.spawnsOnDeath;
     this.spawnCount = data.spawnCount || 0;
+    this.splitSize = config?.sizeOverride ?? 50;
 
     if (data.projectileCooldown) {
       this.projectileRate = data.projectileCooldown;
     }
+
+    this.poolIndex = registerCreature(this);
+
+    if (config) {
+      this.aiMode = config.aiMode ?? AIMode.DIRECT;
+      this.flags = config.flags ?? CreatureFlags.NONE;
+      this.linkIndex = config.linkIndex ?? 0;
+      this.targetOffsetX = config.targetOffsetX ?? null;
+      this.targetOffsetY = config.targetOffsetY ?? null;
+      this.orbitAngle = config.orbitAngle ?? 0;
+      this.orbitRadius = config.orbitRadius ?? 0;
+      this.rangedProjectileType = config.rangedProjectileType ?? 0;
+
+      if (config.tint) {
+        this.customTint = config.tint;
+        const tintHex = tintToHex(config.tint);
+        this.setTint(tintHex);
+        this.setAlpha(config.tint.a);
+      }
+    }
+
+    this.phaseSeed = config?.phaseSeed ?? (Math.random() * 0x17F);
+    this.heading = Math.random() * Math.PI * 2;
+    this.targetX = x;
+    this.targetY = y;
+    this.targetHeading = this.heading;
+
+    if (this.flags & CreatureFlags.SPLIT_ON_DEATH) {
+      this.spawnsOnDeath = undefined;
+    }
+  }
+
+  getAIState(): CreatureAIState {
+    return {
+      x: this.x,
+      y: this.y,
+      hp: this.health,
+      flags: this.flags,
+      aiMode: this.aiMode,
+      linkIndex: this.linkIndex,
+      targetOffsetX: this.targetOffsetX,
+      targetOffsetY: this.targetOffsetY,
+      phaseSeed: this.phaseSeed,
+      orbitAngle: this.orbitAngle,
+      orbitRadius: this.orbitRadius,
+      heading: this.heading,
+      targetX: this.targetX,
+      targetY: this.targetY,
+      targetHeading: this.targetHeading,
+      forceTarget: this.forceTarget,
+      moveScale: this.moveScale
+    };
+  }
+
+  applyAIState(state: CreatureAIState): void {
+    this.aiMode = state.aiMode;
+    this.linkIndex = state.linkIndex;
+    this.targetX = state.targetX;
+    this.targetY = state.targetY;
+    this.targetHeading = state.targetHeading;
+    this.forceTarget = state.forceTarget;
+    this.moveScale = state.moveScale;
+    this.orbitRadius = state.orbitRadius;
   }
 
   update(delta: number, player: Player) {
     if (this.health <= 0 || !this.active || this.isDying) return;
 
     const dt = delta / 1000;
+    const dtMs = delta;
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
 
     this.shadow.setPosition(this.x + this.SHADOW_OFFSET, this.y + this.SHADOW_OFFSET);
@@ -101,7 +241,7 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
       this.setVelocity(0, 0);
       this.freezePulseTimer += dt;
       const pulse = 0.95 + Math.sin(this.freezePulseTimer * 8) * 0.05;
-      const baseScale = getCreatureData(this.creatureType).scale;
+      const baseScale = getCreatureData(this.creatureType).scale * (this.splitSize / 50);
       this.setScale(pulse * baseScale);
       this.shadow.setScale(pulse * baseScale * this.SHADOW_SCALE);
       this.setTint(0x66ddff);
@@ -109,80 +249,160 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     } else {
       if (this.freezePulseTimer > 0) {
         this.freezePulseTimer = 0;
-        const baseScale = getCreatureData(this.creatureType).scale;
+        const baseScale = getCreatureData(this.creatureType).scale * (this.splitSize / 50);
         this.setScale(baseScale);
         this.shadow.setScale(baseScale * this.SHADOW_SCALE);
       }
-      this.clearTint();
+      if (this.customTint) {
+        this.setTint(tintToHex(this.customTint));
+      } else {
+        this.clearTint();
+      }
     }
 
     if (this.poisonTimer > 0) {
       this.poisonTimer -= dt;
       this.poisonDamageTimer += dt;
 
-      if (this.poisonDamageTimer >= 0.5) {
+      const poisonDamage = dt * this.poisonDps;
+      this.health -= poisonDamage;
+
+      if (this.poisonDamageTimer >= 0.2) {
         this.poisonDamageTimer = 0;
-        this.health -= 3;
         this.setTint(0x00ff00);
         this.scene.time.delayedCall(100, () => {
-          if (this.active && this.freezeTimer <= 0) this.clearTint();
+          if (this.active && this.freezeTimer <= 0) {
+            if (this.customTint) {
+              this.setTint(tintToHex(this.customTint));
+            } else {
+              this.clearTint();
+            }
+          }
         });
+      }
 
-        if (this.health <= 0) {
-          this.die();
-          return;
-        }
+      if (this.health <= 0) {
+        this.die();
+        return;
       }
     }
 
-    const dx = player.x - this.x;
-    const dy = player.y - this.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (this.flags & CreatureFlags.SELF_DAMAGE_TICK_STRONG) {
+      this.health -= dt * 180.0;
+      if (this.health <= 0) {
+        this.die();
+        return;
+      }
+    } else if (this.flags & CreatureFlags.SELF_DAMAGE_TICK) {
+      this.health -= dt * 60.0;
+      if (this.health <= 0) {
+        this.die();
+        return;
+      }
+    }
 
-    if (dist > 0) {
-      const heading = Math.atan2(dy, dx);
-      this.setRotation(heading);
-
-      let moveSpeed = 0;
-
-      if (this.isRanged) {
-        this.projectileCooldown -= dt;
-        if (dist > 150) {
-          this.setVelocity(
-            (dx / dist) * this.speed,
-            (dy / dist) * this.speed
-          );
-          moveSpeed = this.speed;
-        } else if (dist < 100) {
-          this.setVelocity(
-            -(dx / dist) * this.speed * 0.5,
-            -(dy / dist) * this.speed * 0.5
-          );
-          moveSpeed = this.speed * 0.5;
-        } else {
-          this.setVelocity(0, 0);
-        }
-
-        if (this.projectileCooldown <= 0 && this.projectiles) {
-          this.fireProjectile(player);
-          this.projectileCooldown = this.projectileRate;
-        }
+    if (this.fleeTimer > 0) {
+      this.fleeTimer -= dt;
+      this.setTint(0xffff00);
+    } else if (this.fleeTimer <= 0 && this.poisonTimer <= 0 && this.freezeTimer <= 0) {
+      if (this.customTint) {
+        this.setTint(tintToHex(this.customTint));
       } else {
-        this.setVelocity(
-          (dx / dist) * this.speed,
-          (dy / dist) * this.speed
-        );
-        moveSpeed = this.speed;
-      }
-
-      if (moveSpeed > 0) {
-        const speedScale = moveSpeed / 100;
-        this.animPhase += dt * this.ANIM_RATE * speedScale;
-        const frameCount = 16;
-        const frame = Math.floor(this.animPhase) % frameCount;
-        this.setFrame(frame);
+        this.clearTint();
       }
     }
+
+    const creatures: CreatureLink[] = creaturePool.map(c => ({
+      x: c.x,
+      y: c.y,
+      hp: c.health,
+      active: c.active && !c.isDying
+    }));
+
+    const rand = () => Math.floor(Math.random() * 0x7FFFFFFF);
+
+    const aiState = this.getAIState();
+
+    tickAI7LinkTimer(aiState, dtMs, rand);
+
+    const result = updateCreatureAITarget(aiState, player.x, player.y, creatures, dt);
+
+    this.applyAIState(aiState);
+    this.moveScale = result.moveScale;
+
+    if (result.selfDamage !== null && result.selfDamage > 0) {
+      this.health -= result.selfDamage;
+      if (this.health <= 0) {
+        this.die();
+        return;
+      }
+    }
+
+    const isFleeing = this.fleeTimer > 0;
+
+    if (isFleeing) {
+      const dx = player.x - this.x;
+      const dy = player.y - this.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 0) {
+        const fleeSpeed = this.speed * 1.5;
+        this.setVelocity(
+          ((-dx) / dist) * fleeSpeed,
+          ((-dy) / dist) * fleeSpeed
+        );
+        const heading = Math.atan2(-dy, -dx);
+        this.setRotation(heading + Math.PI);
+        this.animPhase += dt * this.ANIM_RATE * (fleeSpeed / 100);
+      }
+    } else if (this.aiMode === AIMode.HOLD) {
+      this.setVelocity(0, 0);
+    } else {
+      const turnRate = (this.speed / CREATURE_SPEED_SCALE) * CREATURE_TURN_RATE_SCALE;
+      this.heading = angleApproach(this.heading, this.targetHeading, turnRate, dt);
+
+      const speed = (this.speed / CREATURE_SPEED_SCALE) * CREATURE_SPEED_SCALE * this.moveScale;
+
+      const dirX = Math.cos(this.heading - Math.PI / 2.0);
+      const dirY = Math.sin(this.heading - Math.PI / 2.0);
+
+      this.setVelocity(dirX * speed, dirY * speed);
+      this.setRotation(this.heading - Math.PI / 2.0);
+
+      if (speed > 0) {
+        this.animPhase += dt * this.ANIM_RATE * (speed / 100);
+      }
+    }
+
+    if (this.isRanged && !isFleeing) {
+      this.projectileCooldown -= dt;
+      const distToPlayer = Math.hypot(player.x - this.x, player.y - this.y);
+
+      if (distToPlayer > 64 && this.projectileCooldown <= 0 && this.projectiles) {
+        this.fireProjectile(player);
+        this.projectileCooldown = this.projectileRate;
+      }
+    }
+
+    if (this.flags & CreatureFlags.RANGED_ATTACK_SHOCK && !isFleeing) {
+      const distToPlayer = Math.hypot(player.x - this.x, player.y - this.y);
+      if (distToPlayer > 64 && this.attackCooldown <= 0) {
+        this.fireShockProjectile(player);
+        this.attackCooldown = 1.0;
+      }
+    }
+
+    if (this.flags & CreatureFlags.RANGED_ATTACK_VARIANT && !isFleeing) {
+      const distToPlayer = Math.hypot(player.x - this.x, player.y - this.y);
+      if (distToPlayer > 64 && this.attackCooldown <= 0) {
+        this.fireVariantProjectile(player);
+        const randDelay = (Math.random() * 3) * 0.1;
+        this.attackCooldown = this.orbitAngle + randDelay;
+      }
+    }
+
+    const frameCount = 16;
+    const frame = Math.floor(this.animPhase) % frameCount;
+    this.setFrame(frame);
   }
 
   private fireProjectile(player: Player) {
@@ -207,22 +427,84 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
+  private fireShockProjectile(player: Player) {
+    if (!this.projectiles) return;
+
+    const angle = Math.atan2(player.y - this.y, player.x - this.x);
+    const bullet = this.projectiles.get(this.x, this.y, 'alien_projectile');
+    if (bullet) {
+      bullet.setActive(true);
+      bullet.setVisible(true);
+      bullet.setRotation(angle);
+      bullet.damage = 45;
+      bullet.isEnemyProjectile = true;
+      bullet.setTint(0x00ffff);
+      const body = bullet.body as Phaser.Physics.Arcade.Body;
+      if (body) {
+        body.enable = true;
+        body.setVelocity(
+          Math.cos(angle) * 300,
+          Math.sin(angle) * 300
+        );
+      }
+    }
+  }
+
+  private fireVariantProjectile(player: Player) {
+    if (!this.projectiles) return;
+
+    const angle = Math.atan2(player.y - this.y, player.x - this.x);
+    const bullet = this.projectiles.get(this.x, this.y, 'alien_projectile');
+    if (bullet) {
+      bullet.setActive(true);
+      bullet.setVisible(true);
+      bullet.setRotation(angle);
+      bullet.damage = 45;
+      bullet.isEnemyProjectile = true;
+      bullet.setTint(0xff8800);
+      const body = bullet.body as Phaser.Physics.Arcade.Body;
+      if (body) {
+        body.enable = true;
+        body.setVelocity(
+          Math.cos(angle) * 250,
+          Math.sin(angle) * 250
+        );
+      }
+    }
+  }
+
   canAttack(): boolean {
     return this.attackCooldown <= 0;
   }
 
-  attack(player: Player) {
+  attack(player: Player): boolean {
     if (this.canAttack() && this.damage > 0) {
       player.takeDamage(this.damage);
       this.attackCooldown = this.attackRate;
+      return true;
     }
+    return false;
+  }
+
+  applyContactPoison(strong: boolean) {
+    const duration = strong ? 2.0 : 3.0;
+    const dps = strong ? 180 : 60;
+    this.poisonTimer = duration;
+    this.poisonDamageTimer = 0;
+    this.poisonDps = dps;
   }
 
   takeDamage(amount: number, applyPoison: boolean = false): boolean {
     this.health -= amount;
     this.setTint(0xffffff);
     this.scene.time.delayedCall(50, () => {
-      if (this.active && this.freezeTimer <= 0) this.clearTint();
+      if (this.active && this.freezeTimer <= 0) {
+        if (this.customTint) {
+          this.setTint(tintToHex(this.customTint));
+        } else {
+          this.clearTint();
+        }
+      }
     });
 
     if (applyPoison && this.poisonTimer <= 0) {
@@ -242,6 +524,55 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     this.setVelocity(0, 0);
   }
 
+  flee(duration: number) {
+    this.fleeTimer = duration;
+  }
+
+  applyPlague(damagePerTick: number) {
+    if (this.poisonTimer <= 0) {
+      this.poisonTimer = 5.0;
+      this.poisonDamageTimer = 0;
+      this.poisonDps = damagePerTick * 2;
+    }
+  }
+
+  isFleeing(): boolean {
+    return this.fleeTimer > 0;
+  }
+
+  setDropBonus(bonusType: number, weaponId?: number): void {
+    this.dropBonus = { bonusType, weaponId };
+  }
+
+  hasDropBonus(): boolean {
+    return this.dropBonus !== null;
+  }
+
+  getDropBonus(): { bonusType: number; weaponId?: number } | null {
+    return this.dropBonus;
+  }
+
+  shouldSplitOnDeath(): boolean {
+    return (this.flags & CreatureFlags.SPLIT_ON_DEATH) !== 0 && this.splitSize > 35;
+  }
+
+  getSplitChildren(): { health: number; size: number; speed: number; damage: number; xp: number; heading: number }[] {
+    if (!this.shouldSplitOnDeath()) return [];
+
+    const children = [];
+    for (const headingOffset of [-Math.PI / 2.0, Math.PI / 2.0]) {
+      children.push({
+        health: this.maxHealth * 0.25,
+        size: this.splitSize - 8.0,
+        speed: this.speed * 1.1,
+        damage: this.damage * 0.7,
+        xp: Math.floor(this.xpValue * 2 / 3),
+        heading: wrapAngle(this.heading + headingOffset)
+      });
+    }
+    return children;
+  }
+
   private die() {
     if (this.isDying) return;
     this.isDying = true;
@@ -255,7 +586,11 @@ export class Creature extends Phaser.Physics.Arcade.Sprite {
     this.setTint(0xffffff);
     this.scene.time.delayedCall(50, () => {
       if (!this.active) return;
-      this.clearTint();
+      if (this.customTint) {
+        this.setTint(tintToHex(this.customTint));
+      } else {
+        this.clearTint();
+      }
 
       this.scene.tweens.add({
         targets: [this, this.shadow],
